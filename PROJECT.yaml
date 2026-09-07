@@ -33,6 +33,10 @@ rules:
   registry: REGISTRY_RULES.md
   drive_write: DRIVE_WRITE_RULES.md
   verification: VERIFICATION_RULES.md
+tools:
+  notes: notes.py
+  registry: registry.py
+  verification: verification.py
 policy:
   registry_first: true
   duplicate_check_before_id: true
