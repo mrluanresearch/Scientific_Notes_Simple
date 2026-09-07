@@ -7,20 +7,86 @@ read_scope: partial
 status: draft
 ---
 
-# [Tiêu đề tài liệu]
+# TODO_EXACT_SOURCE_TITLE
 
 ## 1. Tài liệu và phạm vi đọc
 
-[Trích dẫn đầy đủ: tác giả, năm, tên tài liệu, journal/book/report, volume(issue), pages/article number, DOI/URL nếu có.]
+### 1.1. Định danh canonical và quy tắc tên
 
-- **PDF/source canonical:** [tên tệp hoặc liên kết Drive; nếu có HTML/supplement/raw data thì liệt kê riêng].
+- **Note:** `SAL-0001.md` — filename chỉ dùng ID, không thêm tác giả/năm/tiêu đề/final.
+- **Citation key:** `SAL-0001` — dùng ổn định trong bản thảo, ví dụ `[@SAL-0001]`.
+- **PDF source:** `SAL-0001.pdf`.
+- **Supplement/data liên quan:** `SAL-0001-supp-01.*`, `SAL-0001-data-01.*` nếu có.
+- **Publication status:** [version of record / preprint / corrected / retracted / khác].
+- **Quan hệ phiên bản:** [Không / is-version-of SAL-xxxx / is-corrected-by SAL-xxxx / corrects SAL-xxxx / retracted-by SAL-xxxx].
+
+H1 phải là **tiêu đề tài liệu gốc chính xác**. Không dùng H1 như tiêu đề nhận xét của MRLUAN.
+
+### 1.2. Metadata trích dẫn chuẩn hóa — CSL-ready
+
+Metadata dưới đây là dữ liệu canonical để sinh APA 7, Vancouver, Harvard, Chicago, IEEE... Không lưu một chuỗi APA đã format làm nguồn chuẩn. Xem `CITATION_RULES.md`.
+
+<!-- CITATION_METADATA_START -->
+```yaml
+citation:
+  id: SAL-0001
+  type: article-journal
+  author:
+    - family: TODO
+      given: TODO
+  issued:
+    date-parts:
+      - [null]
+  title: "TODO_EXACT_SOURCE_TITLE"
+  container-title: ""
+  volume: ""
+  issue: ""
+  page: ""
+  DOI: ""
+  URL: ""
+  publisher: ""
+  publisher-place: ""
+  edition: ""
+  editor: []
+  ISBN: ""
+  ISSN: ""
+  language: ""
+  accessed:
+    date-parts: []
+```
+<!-- CITATION_METADATA_END -->
+
+**Quy tắc tên tác giả:** giữ đủ tất cả tác giả và đúng thứ tự version of record; mỗi người dùng `family` + `given`. Corporate author dùng `literal`, ví dụ `- literal: World Health Organization`. Không ghi `et al.` trong metadata.
+
+**Quy tắc ngày:** `issued.date-parts` dùng `[YYYY]`, `[YYYY, M]` hoặc `[YYYY, M, D]`; năm phải khớp YAML `year`. `accessed` chỉ cần cho webpage/nội dung động khi phù hợp.
+
+**Quy tắc locator:** journal article cần cố gắng giữ volume, issue và page/article number. DOI lưu dạng `10.xxxx/...`, không có `https://doi.org/`, và phải khớp YAML `doi`.
+
+### 1.3. Trích dẫn đối chiếu và nguồn metadata
+
+**Trích dẫn đọc được bởi người:** [Tác giả đầy đủ. (Năm). Tiêu đề. Journal/book/report, volume(issue), pages/article number. DOI/URL. Đây là bản đối chiếu, không phải canonical style string.]
+
+| Thành phần metadata | Giá trị đã xác minh | Nguồn xác minh | Ghi chú |
+| --- | --- | --- | --- |
+| Tác giả + thứ tự | [đầy đủ] | [PDF/publisher/Crossref/PubMed] | [nếu có khác biệt] |
+| Ngày/năm xuất bản | [YYYY-MM-DD hoặc YYYY] | [nguồn] | [online first vs issue date nếu có] |
+| Title | [exact title] | [nguồn] | [giữ nguyên tên khoa học/proper nouns] |
+| Journal/container | [tên đầy đủ] | [nguồn] | [abbreviation nếu cần ghi riêng] |
+| Volume(issue) | [x(y)] | [nguồn] | |
+| Pages/article number | [x-y / e12345] | [nguồn] | |
+| DOI | [10.xxxx/...] | [nguồn] | |
+| URL canonical | [publisher/repository] | [nguồn] | |
+
+### 1.4. Phạm vi đọc và bản đồ nguồn
+
+- **PDF/source canonical đã đọc:** [tên file/Drive; HTML nếu có].
 - **Loại tài liệu:** [nghiên cứu thực nghiệm / giám sát / WGS / systematic review / meta-analysis / guideline / khác].
 - **Phạm vi đã đọc:** [toàn văn hay phần cụ thể; bảng/hình/phụ lục nào đã kiểm tra trực quan].
 - **Phần chưa có/chưa đọc:** [supplement, raw reads, accession, protocol, appendix...]; nếu không có thì ghi `Không`.
 - **Ngày và người soát:** [YYYY-MM-DD; MRLUAN hoặc tên người thực sự đọc].
 - **Lý do giữ `draft` nếu có:** [bất nhất số liệu, thiếu supplement, chưa kiểm tra raw data, chưa tái tính một chỉ số quan trọng...].
 
-**Bản đồ nguồn cần quay lại:** ghi cụ thể vị trí của Methods, bảng/hình kết quả chính, supplement và data availability. Mục tiêu là người đọc có thể tìm lại đúng bằng chứng trong vài giây, không phải đọc lại toàn PDF.
+**Bản đồ nguồn cần quay lại:** ghi cụ thể vị trí Methods, bảng/hình kết quả chính, supplement và Data Availability. Mục tiêu là người đọc tìm lại đúng bằng chứng trong vài giây thay vì đọc lại toàn PDF.
 
 ## 2. Câu hỏi và đóng góp chính
 
@@ -48,7 +114,7 @@ status: draft
 | --- | ---: | ---: | ---: | --- | --- |
 | [Bước] | [n] | [n/lý do] | [n] | [sample/isolate/genome...] | [Methods/Table/Figure/page] |
 
-[Nếu không thể dựng flow vì nguồn không báo cáo đủ, ghi chính xác chỗ thiếu. Không tự suy từ các bảng rời.] 
+[Nếu không thể dựng flow vì nguồn không báo cáo đủ, ghi chính xác chỗ thiếu. Không tự suy từ các bảng rời.]
 
 ### 3.2. Thu thập mẫu, nuôi cấy/đo lường và định danh
 
@@ -66,7 +132,7 @@ status: draft
 | --- | --- | --- | --- | --- | --- |
 | [PCR/WGS/assembly/AMR/phylogeny...] | [...] | [...] | [...] | [...] | [...] |
 
-[Nếu primer có ý nghĩa sử dụng lại, giữ nguyên sequence 5′→3′ trong bảng con. Nếu nguồn không báo version/database date, ghi `không báo cáo` thay vì tự điền.] 
+[Nếu primer có ý nghĩa sử dụng lại, giữ nguyên sequence 5′→3′ trong bảng con. Nếu nguồn không báo version/database date, ghi `không báo cáo` thay vì tự điền.]
 
 ### 3.4. Phân tích thống kê
 
@@ -136,7 +202,7 @@ status: draft
 
 ### 6.3. Không dùng để kết luận
 
-[Liệt kê các suy rộng nguồn không hỗ trợ. Đây là hàng rào chống overclaim khi viết luận án.] 
+[Liệt kê các suy rộng nguồn không hỗ trợ. Đây là hàng rào chống overclaim khi viết luận án.]
 
 ## 7. Cách dùng lại và phần còn thiếu
 
