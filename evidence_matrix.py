@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Validate the study-level EVIDENCE_MATRIX.csv for Scientific_Notes_Simple.
 
-This script validates schema, identity, provenance, staleness and cross-file consistency.
-It never infers scientific evidence from PDFs/notes and never upgrades scientific quality
-or source verification automatically.
+This script validates schema, identity, provenance, staleness, structural cleanliness,
+and cross-file consistency. It never infers scientific evidence from PDFs/notes and
+never upgrades scientific quality or matrix status automatically.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import sys
 ID_RE = re.compile(r"SAL-\d{4,}$")
 NOTE_STATUS_RE = re.compile(r"(?m)^status:\s*(draft|checked)\s*$")
 NOTE_ID_RE = re.compile(r"(?m)^id:\s*(SAL-\d{4,})\s*$")
+MARKDOWN_HEADING_RE = re.compile(r"(?m)^#{2,6}\s+")
 
 MATRIX_FIELDS = [
     "id",
@@ -55,6 +56,34 @@ MATRIX_FIELDS = [
     "note_sha256",
     "canonical_url",
     "matrix_generated_at",
+]
+
+# These are scientific-content cells, not Markdown note containers. A heading copied
+# into one of these fields means section-boundary leakage occurred during extraction.
+SYNTHESIS_TEXT_FIELDS = [
+    "population_sample_context",
+    "denominator_prevalence_summary",
+    "serovar_summary",
+    "ast_summary",
+    "amr_gene_summary",
+    "virulence_summary",
+    "genomics_mlst_plasmid_phylogeny_summary",
+    "negative_findings_exceptions",
+    "arithmetic_internal_consistency",
+    "main_limitations",
+    "thesis_use",
+    "comparison_conditions",
+    "do_not_conclude",
+    "evidence_reuse_decision",
+]
+
+EVIDENCE_DOMAIN_FIELDS = [
+    "denominator_prevalence_summary",
+    "serovar_summary",
+    "ast_summary",
+    "amr_gene_summary",
+    "virulence_summary",
+    "genomics_mlst_plasmid_phylogeny_summary",
 ]
 
 ALLOWED_SCOPES = {
@@ -159,6 +188,8 @@ def validate(args):
     verification = {row.get("id", "").strip(): row for row in verification_rows}
 
     matrix_by_id = {}
+    status_counts = {status: 0 for status in ALLOWED_MATRIX_STATUS}
+
     for row_number, row in enumerate(matrix_rows, start=2):
         rid = (row.get("id") or "").strip()
         if not ID_RE.fullmatch(rid):
@@ -175,6 +206,8 @@ def validate(args):
         status = (row.get("matrix_status") or "").strip()
         if status not in ALLOWED_MATRIX_STATUS:
             errors.append(f"{rid}: matrix_status không hợp lệ: {status!r}")
+        else:
+            status_counts[status] += 1
 
         note_status = (row.get("note_status") or "").strip()
         if note_status not in ALLOWED_NOTE_STATUS:
@@ -192,16 +225,20 @@ def validate(args):
             if not (row.get(field) or "").strip():
                 errors.append(f"{rid}: thiếu field bắt buộc {field}")
 
+        # Structural guard: matrix cells are synthesis text, not copied note sections.
+        for field in SYNTHESIS_TEXT_FIELDS:
+            value = row.get(field) or ""
+            if MARKDOWN_HEADING_RE.search(value):
+                errors.append(
+                    f"{rid}: {field} chứa Markdown heading — có khả năng section-boundary leakage"
+                )
+
         if status == "checked_against_checked_note":
             if note_status != "checked":
                 errors.append(f"{rid}: matrix checked nhưng note_status không phải checked")
             if not (row.get("source_verification_result") or "").strip():
                 errors.append(f"{rid}: matrix checked nhưng thiếu source_verification_result")
-            if not any((row.get(field) or "").strip() for field in (
-                "denominator_prevalence_summary", "serovar_summary", "ast_summary",
-                "amr_gene_summary", "virulence_summary",
-                "genomics_mlst_plasmid_phylogeny_summary",
-            )):
+            if not any((row.get(field) or "").strip() for field in EVIDENCE_DOMAIN_FIELDS):
                 warnings.append(f"{rid}: matrix checked nhưng không có evidence-domain summary")
 
     matrix_ids = set(matrix_by_id)
@@ -262,7 +299,18 @@ def validate(args):
         for value, first_row, second_row in duplicate_nonempty(matrix_rows, field):
             errors.append(f"duplicate {field}: {value!r} ở rows {first_row} và {second_row}")
 
-    return errors, warnings, len(active_registry), len(matrix_rows)
+    if args.require_all_checked:
+        not_checked = sorted(
+            rid for rid, row in matrix_by_id.items()
+            if (row.get("matrix_status") or "").strip() != "checked_against_checked_note"
+        )
+        if not_checked:
+            errors.append(
+                "require-all-checked: còn row chưa checked_against_checked_note: "
+                + ", ".join(not_checked)
+            )
+
+    return errors, warnings, len(active_registry), len(matrix_rows), status_counts
 
 
 def main():
@@ -271,10 +319,15 @@ def main():
     parser.add_argument("--registry", type=Path, default=Path("results/SOURCE_REGISTRY.csv"))
     parser.add_argument("--verification", type=Path, default=Path("results/SOURCE_VERIFICATION.csv"))
     parser.add_argument("--notes", type=Path, default=Path("results/MD"))
+    parser.add_argument(
+        "--require-all-checked",
+        action="store_true",
+        help="Fail if any matrix row is not checked_against_checked_note.",
+    )
     args = parser.parse_args()
 
     try:
-        errors, warnings, active_count, matrix_count = validate(args)
+        errors, warnings, active_count, matrix_count, status_counts = validate(args)
     except (OSError, ValueError, KeyError) as exc:
         print(f"LỖI: {exc}", file=sys.stderr)
         return 2
@@ -285,7 +338,9 @@ def main():
         print("CẦN XEM:", message)
     print(
         f"{active_count} active registry record; {matrix_count} matrix row; "
-        f"{len(errors)} lỗi; {len(warnings)} cảnh báo."
+        f"checked={status_counts['checked_against_checked_note']}; "
+        f"generated={status_counts['generated_from_checked_note']}; "
+        f"draft={status_counts['draft']}; {len(errors)} lỗi; {len(warnings)} cảnh báo."
     )
     return 2 if errors else (1 if warnings else 0)
 
