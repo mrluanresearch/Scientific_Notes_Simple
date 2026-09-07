@@ -25,8 +25,17 @@ naming:
   dataset: SAL-xxxx-data-NN.ext
   protocol: SAL-xxxx-protocol-NN.ext
   code_snapshot: SAL-xxxx-code-NN.ext
+rules:
+  citation: CITATION_RULES.md
+  registry: REGISTRY_RULES.md
+  drive_write: DRIVE_WRITE_RULES.md
 policy:
   registry_first: true
   duplicate_check_before_id: true
+  drive_read_before_write: true
+  update_existing_canonical_in_place: true
+  duplicate_canonical_filenames_forbidden: true
+  post_write_inventory_required: true
+  drive_write_idempotent: true
   results_on_github: false
   source_on_drive: false
