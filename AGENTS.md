@@ -1,6 +1,6 @@
 # Viết source note: nội dung khoa học là sản phẩm chính
 
-Đọc README.md, NOTE_TEMPLATE.md và CITATION_RULES.md; xem examples/SAL-0001.md để hiểu cách ghi bằng chứng. **Vai trò thực thi canonical là MRLUAN**; khi ghi người thực hiện/soát note, dùng MRLUAN hoặc tên người soát cụ thể. Dự án phục vụ Salmonella–AMR–WGS–One Health; ngữ cảnh luận án chưa xác minh không được coi là dữ liệu đã thực hiện.
+Đọc `README.md`, `NOTE_TEMPLATE.md`, `CITATION_RULES.md` và `REGISTRY_RULES.md`; xem `examples/SAL-0001.md` để hiểu cách ghi bằng chứng. **Vai trò thực thi canonical là MRLUAN**; khi ghi người thực hiện/soát note, dùng MRLUAN hoặc tên người soát cụ thể. Dự án phục vụ Salmonella–AMR–WGS–One Health; ngữ cảnh luận án chưa xác minh không được coi là dữ liệu đã thực hiện.
 
 ## Nguyên tắc bắt buộc
 
@@ -8,45 +8,70 @@ Một note đạt yêu cầu phải **tự đứng được**. Nếu thông tin 
 
 Không tối giản note để tiết kiệm token. Không dùng abstract như thay thế cho việc đọc Methods/Results/Tables/Figures. Không viết hàng loạt nhiều note ngắn rồi coi đó là hoàn thành. Mỗi tài liệu được xử lý như một đơn vị khoa học độc lập.
 
+## Registry-first: chống trùng trước khi cấp ID
+
+`results/SOURCE_REGISTRY.csv` trên Google Drive là sổ đăng ký canonical cho **identity intake + file mapping**. Trước khi cấp `SAL-xxxx`, đổi tên/upload PDF hoặc tạo MD, MRLUAN phải kiểm tra registry theo `REGISTRY_RULES.md`.
+
+Thứ tự kiểm tra bắt buộc khi thông tin có sẵn:
+
+1. DOI sau chuẩn hóa.
+2. PMID/PMCID.
+3. SHA-256 của main PDF.
+4. Exact normalized title + first author + year.
+5. Exact title với năm cùng hoặc lệch ±1 để phát hiện online-first/preprint/version.
+6. Fuzzy title chỉ dùng tạo candidate review; không auto-merge.
+
+Nếu DOI/hash/identifier trùng chắc chắn: không cấp ID mới. Nếu candidate mơ hồ: review publication/version trước. Chỉ source mới thực sự mới được cấp SAL ID tiếp theo.
+
+Registry giữ `original_filename` để truy vết tên file người dùng cung cấp. Không dùng original filename làm canonical identity. Nếu một ID đã được cấp rồi mới phát hiện duplicate, không tái sử dụng ID đó cho nguồn khác; giữ audit trail bằng `registry_status=duplicate` và `duplicate_of`.
+
 ## Định danh và đặt tên
 
 - Note canonical luôn là `SAL-xxxx.md`; không thêm tác giả, năm, tiêu đề, `final`, ngày hoặc trạng thái vào filename.
-- PDF canonical là `SAL-xxxx.pdf`; supplement/data dùng hậu tố `-supp-01`, `-data-01` theo CITATION_RULES.md.
+- Main PDF/version of record canonical là `SAL-xxxx.pdf`.
+- Một source active có tối đa một main PDF và một main MD cùng ID.
+- Supplement/data dùng hậu tố có loại + chỉ số: `-supp-01`, `-data-01`, `-protocol-01`, `-code-01` theo `REGISTRY_RULES.md`.
+- Không dùng hậu tố mơ hồ `new`, `old`, `final`, `v2`, `(1)` cho asset canonical.
 - Citation key nội bộ chính là `SAL-xxxx`; khi dùng Pandoc/CSL có thể gọi `[@SAL-xxxx]`.
 - H1 phải là **exact source title**, không phải tiêu đề phân tích do MRLUAN đặt.
 - ID không đổi khi sửa title/DOI/author metadata.
+- Không renumber khi sort lại năm/title. Sau `SAL-9999` có thể mở rộng thành `SAL-10000`.
 - Correction/retraction/version có quan hệ khoa học đáng theo dõi phải được liên kết rõ; không xóa dấu vết nguồn cũ.
 
 ## Metadata trích dẫn
 
-Mục 1 phải có block `citation:` theo NOTE_TEMPLATE.md. Đây là metadata canonical để sinh APA 7, Vancouver, Harvard, Chicago, IEEE và các style khác. **Không dùng một chuỗi APA đã format làm dữ liệu canonical.**
+Mục 1 phải có block `citation:` theo `NOTE_TEMPLATE.md`. Đây là metadata canonical để sinh APA 7, Vancouver, Harvard, Chicago, IEEE và các style khác. **Không dùng một chuỗi APA đã format làm dữ liệu canonical.**
 
 Bắt buộc kiểm tra:
 
-- `citation.id` khớp YAML `id` và filename.
-- `citation.title` khớp H1 và title của version of record.
+- `citation.id` khớp YAML `id`, filename và SAL ID trong registry.
+- `citation.title` khớp H1, registry `title` và title của version of record.
 - Tất cả tác giả được lưu đủ, đúng thứ tự; cá nhân dùng `family` + `given`, tổ chức dùng `literal`; không ghi `et al.`.
-- `issued.date-parts` giữ ngày xuất bản tốt nhất có thể; năm phải khớp YAML `year`.
+- `issued.date-parts` giữ ngày xuất bản tốt nhất có thể; năm phải khớp YAML `year` và registry `year`.
 - Journal article: cố gắng giữ tên journal đầy đủ, volume, issue, pages/article number, DOI; URL canonical nếu có.
-- DOI ở YAML và citation block phải cùng một DOI chuẩn `10.xxxx/...`, không có `https://doi.org/`.
-- Book/chapter/report/thesis/conference/dataset/software/webpage phải giữ các trường type-specific theo CITATION_RULES.md.
+- DOI ở YAML, citation block và registry phải cùng một DOI chuẩn `10.xxxx/...`, không có `https://doi.org/`.
+- Book/chapter/report/thesis/conference/dataset/software/webpage phải giữ các trường type-specific theo `CITATION_RULES.md`.
 - Nếu PDF, publisher, Crossref/PubMed hoặc issue page mâu thuẫn metadata, ưu tiên version of record làm canonical và ghi bất nhất ở mục 1; không âm thầm chọn.
 
 Metadata bibliographic phải đủ để sau này xuất CSL-JSON. Khi cần thay APA sang Vancouver/Chicago/IEEE, đổi CSL style; không sửa tay từng note.
 
 ## Quy trình cho từng tài liệu
 
-1. Tra ID/DOI/tiêu đề trong kho để tránh trùng. Xác định PDF canonical, publication status, supplement/raw data và version of record.
-2. Xác minh bibliographic identity trước: authors, issued date/year, exact title, container, volume/issue/page/article number, DOI/URL. Điền block citation và bảng nguồn metadata ở mục 1.
-3. Đọc toàn bộ Methods, Results, tables, figure captions, Discussion/Limitations và Data availability. Với bảng/hình mà text extraction làm mất cấu trúc, phải kiểm tra trực quan.
-4. Dựng **bản đồ dữ liệu** trước khi viết prose: population → sampling → laboratory/measurement → molecular/bioinformatics → statistics → primary results → negative results → limitations.
-5. Viết mục 3 và 4 trước. Giữ các số lượng ở từng bước, unit of analysis, denominator, unit, protocol, version, threshold, control, reference group và source location.
-6. Với PCR: giữ target, primer sequence khi có giá trị dùng lại, amplicon size, reaction/cycling condition nếu nguồn báo cáo. Với WGS: giữ platform/library/read length nếu có, reference genome, tool/database/version, identity/coverage/SNP thresholds, accession và cách tạo phylogeny. Với AST: giữ drug, disk concentration/MIC method, CLSI/EUCAST version hoặc năm, breakpoint nếu nguồn nêu. Với meta-analysis: giữ search dates/databases, inclusion/exclusion, effect model, heterogeneity, subgroup/meta-regression, publication-bias/sensitivity analysis.
-7. Chép lại **các bảng con cần dùng lại** vào Markdown. Không ghi “xem Table X” thay cho số liệu. Không cần chép bảng không liên quan, nhưng các bảng quyết định kết luận phải có denominator và chú thích đủ để hiểu độc lập.
-8. Tính lại các tỷ lệ/tổng/OR đơn giản có thể kiểm tra từ dữ liệu nguồn. So sánh Abstract ↔ Results ↔ Table ↔ Figure. Nếu không khớp, giữ nguyên các giá trị nguồn, ghi phép tính và vị trí từng giá trị; không tự sửa hoặc chọn số “hợp lý hơn”.
-9. Viết mục 5 sau khi dữ liệu đã cố định. Tách ba lớp: **kết quả nguồn**, **diễn giải tác giả**, **nhận định MRLUAN**. Không biến giả thuyết cơ chế thành quan sát.
-10. Viết mục 6–8 từ bằng chứng đã ghi, không từ trí nhớ. Đoạn tổng hợp phải có số liệu trung tâm, đúng mẫu số và giới hạn.
-11. Tạm đóng PDF và tự kiểm tra: có thể trả lời nghiên cứu làm trên ai/cái gì, bằng phương pháp nào, số lượng ở từng bước, kết quả chính theo denominator nào, giới hạn gì, có thể tính lại phần nào, và có thể tạo citation đúng từ metadata hay không? Nếu chưa, quay lại nguồn và bổ sung.
+1. **Registry check trước:** lấy exact title, first author, year, DOI/PMID/PMCID và PDF SHA-256 khi có; tra `SOURCE_REGISTRY.csv`. Không cấp ID/upload nếu còn hard/probable duplicate chưa giải quyết.
+2. Nếu là source mới, đăng ký SAL ID và canonical filenames trong registry; giữ original filename trong row.
+3. Xác định PDF canonical, publication status, supplement/raw data và version of record. Main source lưu `SAL-xxxx.pdf`; supporting assets theo hậu tố chuẩn.
+4. Xác minh bibliographic identity: authors, issued date/year, exact title, container, volume/issue/page/article number, DOI/URL. Điền block citation và bảng nguồn metadata ở mục 1.
+5. Tạo `SAL-xxxx.md` đúng ID đã đăng ký; không để script cấp một ID khác với registry.
+6. Đọc toàn bộ Methods, Results, tables, figure captions, Discussion/Limitations và Data availability. Với bảng/hình mà text extraction làm mất cấu trúc, phải kiểm tra trực quan.
+7. Dựng **bản đồ dữ liệu** trước khi viết prose: population → sampling → laboratory/measurement → molecular/bioinformatics → statistics → primary results → negative results → limitations.
+8. Viết mục 3 và 4 trước. Giữ các số lượng ở từng bước, unit of analysis, denominator, unit, protocol, version, threshold, control, reference group và source location.
+9. Với PCR: giữ target, primer sequence khi có giá trị dùng lại, amplicon size, reaction/cycling condition nếu nguồn báo cáo. Với WGS: giữ platform/library/read length nếu có, reference genome, tool/database/version, identity/coverage/SNP thresholds, accession và cách tạo phylogeny. Với AST: giữ drug, disk concentration/MIC method, CLSI/EUCAST version hoặc năm, breakpoint nếu nguồn nêu. Với meta-analysis: giữ search dates/databases, inclusion/exclusion, effect model, heterogeneity, subgroup/meta-regression, publication-bias/sensitivity analysis.
+10. Chép lại **các bảng con cần dùng lại** vào Markdown. Không ghi “xem Table X” thay cho số liệu. Không cần chép bảng không liên quan, nhưng các bảng quyết định kết luận phải có denominator và chú thích đủ để hiểu độc lập.
+11. Tính lại các tỷ lệ/tổng/OR đơn giản có thể kiểm tra từ dữ liệu nguồn. So sánh Abstract ↔ Results ↔ Table ↔ Figure. Nếu không khớp, giữ nguyên các giá trị nguồn, ghi phép tính và vị trí từng giá trị; không tự sửa hoặc chọn số “hợp lý hơn”.
+12. Viết mục 5 sau khi dữ liệu đã cố định. Tách ba lớp: **kết quả nguồn**, **diễn giải tác giả**, **nhận định MRLUAN**. Không biến giả thuyết cơ chế thành quan sát.
+13. Viết mục 6–8 từ bằng chứng đã ghi, không từ trí nhớ. Đoạn tổng hợp phải có số liệu trung tâm, đúng mẫu số và giới hạn.
+14. Tạm đóng PDF và tự kiểm tra: có thể trả lời nghiên cứu làm trên ai/cái gì, bằng phương pháp nào, số lượng ở từng bước, kết quả chính theo denominator nào, giới hạn gì, có thể tính lại phần nào, và có thể tạo citation đúng từ metadata hay không? Nếu chưa, quay lại nguồn và bổ sung.
+15. Sau khi tạo/soát note, cập nhật registry `note_status` và `updated_at`. Registry, MD và filename phải vẫn đồng nhất ID/title/year/DOI.
 
 ## Mức chi tiết tối thiểu theo loại nguồn
 
@@ -111,7 +136,11 @@ Không viết giới hạn chung chung. Mỗi nhận định phải nối vào m
 
 Nếu phát hiện bất nhất khoa học hoặc bibliographic, ưu tiên **giữ draft và giải thích** hơn là làm đẹp trạng thái.
 
+Registry có trạng thái riêng (`active`, `review`, `duplicate`, `excluded`, `superseded`) và không thay thế `draft/checked` của note.
+
 ## Kiểm tra bằng script
+
+`registry.py` quản lý `SOURCE_REGISTRY.csv`: khởi tạo, tìm candidate, cấp ID, tính PDF SHA-256 và kiểm tra exact duplicate keys. Kết quả fuzzy/title match chỉ là candidate; MRLUAN quyết định version relationship.
 
 `notes.py check` chỉ là QC cấu trúc. Nó phải cảnh báo các note `full_text` quá ngắn, mục 3–4 quá mỏng, thiếu bảng dữ liệu, còn placeholder, thiếu citation block hoặc citation metadata không nhất quán. Cảnh báo script không thay thế appraisal khoa học; ngược lại, `0 warnings` cũng không chứng minh note đúng.
 
@@ -119,8 +148,12 @@ Nếu phát hiện bất nhất khoa học hoặc bibliographic, ưu tiên **gi�
 
 ## Làm theo đợt
 
-Với kho lớn, xử lý từng nguồn hoàn chỉnh rồi mới chuyển nguồn tiếp theo. Sau khoảng 10–20 nguồn, rà ngược 2–3 note với PDF để phát hiện lỗi lặp lại và cập nhật template/hướng dẫn. Không hy sinh chiều sâu để đạt số lượng.
+Với kho lớn, xử lý từng nguồn hoàn chỉnh rồi mới chuyển nguồn tiếp theo. Sau khoảng 10–20 nguồn, chạy `registry.py check` và rà ngược 2–3 note với PDF để phát hiện lỗi lặp lại; cập nhật template/hướng dẫn khi cần. Không hy sinh chiều sâu để đạt số lượng.
 
 ## Lưu trữ
 
-Kết quả ở `results/MD` và `results/PDF` trên Google Drive. Source PDF giữ nguyên. Mã nguồn, mẫu, hướng dẫn và cấu hình remote ở GitHub canonical. GitHub không chứa corpus MD/PDF; Drive không là canonical source-code repository.
+- `results/SOURCE_REGISTRY.csv`: registry identity/chống trùng/file mapping trên Google Drive.
+- `results/MD`: scientific notes và file dẫn xuất từ note.
+- `results/PDF`: main PDF và supporting assets.
+- Source PDF giữ nguyên bytes; chỉ canonical filename thay đổi khi lưu vào project.
+- Mã nguồn, mẫu, hướng dẫn và cấu hình remote ở GitHub canonical. GitHub không chứa corpus MD/PDF/CSV registry; Drive không là canonical source-code repository.
