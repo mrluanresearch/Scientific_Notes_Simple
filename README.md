@@ -8,40 +8,99 @@ Một mẫu note cho 1.000 tài liệu. Sáu trường YAML; nội dung khoa h�
 
 | Thành phần | Vai trò |
 | --- | --- |
-| AGENTS.md | Quy tắc MRLUAN đọc nguồn, bảo toàn dữ liệu, phản biện và QC |
-| NOTE_TEMPLATE.md | Mẫu duy nhất: sáu trường YAML, tám mục cấp `##`, các tiểu mục chi tiết bắt buộc |
-| CITATION_RULES.md | Quy tắc đặt tên note/PDF, metadata citation và chuẩn bị APA/Vancouver/Chicago/IEEE/Harvard |
-| examples/SAL-0001.md | Note đã điền trên bài Neuert và cộng sự (2018), kèm nguồn và giới hạn đọc |
-| notes.py | Tạo khung, kiểm tra cấu trúc/độ sâu/citation, lập mục lục, xuất CSL-JSON |
-| requirements.txt | Một dependency: PyYAML |
-| PROJECT.yaml | Ánh xạ canonical giữa GitHub, Google Drive và vai trò MRLUAN |
+| `AGENTS.md` | Quy tắc MRLUAN đọc nguồn, bảo toàn dữ liệu, phản biện và QC |
+| `NOTE_TEMPLATE.md` | Mẫu duy nhất: sáu trường YAML, tám mục cấp `##`, các tiểu mục chi tiết bắt buộc |
+| `CITATION_RULES.md` | Metadata citation và quy tắc publication/version |
+| `REGISTRY_RULES.md` | Quy tắc cấp SAL ID, đặt tên PDF/MD và chống trùng qua `SOURCE_REGISTRY.csv` |
+| `registry.py` | Khởi tạo/check/find/register source trong CSV registry; chuẩn hóa DOI/title/author và tính PDF SHA-256 |
+| `examples/SAL-0001.md` | Note đã điền trên bài Neuert và cộng sự (2018), kèm nguồn và giới hạn đọc |
+| `notes.py` | Tạo khung, kiểm tra cấu trúc/độ sâu/citation, lập mục lục, xuất CSL-JSON |
+| `requirements.txt` | Một dependency: PyYAML |
+| `PROJECT.yaml` | Ánh xạ canonical giữa GitHub, Google Drive và vai trò MRLUAN |
 
-Script không tự viết phân tích, không gọi LLM và không đọc PDF tự động. `notes.py check` chỉ kiểm tra cấu trúc và các dấu hiệu note quá mỏng hoặc metadata citation không nhất quán; tính đúng khoa học vẫn do MRLUAN đối chiếu nguồn.
+`notes.py` không tự viết phân tích, không gọi LLM và không đọc PDF tự động. `notes.py check` chỉ kiểm tra cấu trúc và các dấu hiệu note quá mỏng hoặc metadata citation không nhất quán; tính đúng khoa học vẫn do MRLUAN đối chiếu nguồn. `registry.py` chỉ quản lý identity/intake và duplicate candidates, không thay scientific appraisal.
 
 ## Triển khai canonical
 
 - Vai trò ghi và soát scientific note: **MRLUAN**.
 - Mã nguồn, template, hướng dẫn và cấu hình: `https://github.com/mrluanresearch/Scientific_Notes_Simple`.
 - Dữ liệu nghiên cứu và kết quả: Google Drive root `https://drive.google.com/drive/folders/1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_`.
+- `results/SOURCE_REGISTRY.csv`: sổ đăng ký source canonical, cấp ID/chống trùng/file mapping.
 - `results/MD/`: note Markdown, `INDEX.md`, và có thể có `references.csl.json`.
 - `results/PDF/`: PDF nguồn canonical và supplement/data liên quan.
-- `results/` bị loại khỏi Git; corpus MD/PDF không lên GitHub. Drive không giữ bản canonical của source code.
+- `results/` bị loại khỏi Git; corpus MD/PDF/CSV registry không lên GitHub. Drive không giữ bản canonical của source code.
 
-## Quy tắc đặt tên
+## Quy tắc đặt tên file
 
-Canonical identity là `SAL-xxxx`, không phải author-year-title.
+Canonical identity là `SAL-xxxx`, không phải author-year-title. **ID được cấp sau khi kiểm tra `SOURCE_REGISTRY.csv`, không cấp trực tiếp từ filename người dùng.**
+
+### Main files
 
 - Note: `SAL-0001.md`.
-- PDF chính: `SAL-0001.pdf`.
-- Supplement: `SAL-0001-supp-01.pdf`.
-- Data file: `SAL-0001-data-01.csv`.
-- Citation key: `SAL-0001`; khi dùng Pandoc/CSL có thể gọi `[@SAL-0001]`.
+- PDF chính/version of record: `SAL-0001.pdf`.
+- Một source canonical có tối đa một main PDF và một main MD cùng SAL ID.
 - H1 của note phải là **exact source title**.
-- Không dùng filename kiểu `Abdallah_2023_final.md`, không thêm `final2`, ngày hoặc trạng thái.
-- Sửa title/DOI/author metadata không đổi SAL ID.
-- Preprint/version of record/correction/retraction xử lý theo `CITATION_RULES.md` để giữ provenance.
+- Citation key: `SAL-0001`; khi dùng Pandoc/CSL có thể gọi `[@SAL-0001]`.
 
-Lý do dùng ID ổn định: citation style và bibliographic metadata có thể được sửa mà không làm vỡ link Drive, INDEX, citation key hoặc các tham chiếu nội bộ.
+### Asset phụ
+
+- Supplement: `SAL-0001-supp-01.pdf`, `SAL-0001-supp-02.xlsx`, ...
+- Dataset: `SAL-0001-data-01.csv`, `SAL-0001-data-02.xlsx`, ...
+- Protocol: `SAL-0001-protocol-01.pdf`.
+- Code/archive snapshot: `SAL-0001-code-01.zip`.
+
+Không dùng filename kiểu `Abdallah_2023_final.md`, `paper(1).pdf`, `SAL-0001-final.pdf`, `final2`, ngày xử lý hoặc trạng thái. Tên file gốc lúc ingest được giữ trong `SOURCE_REGISTRY.csv` ở cột `original_filename`, không dùng làm canonical filename.
+
+Sửa title/DOI/author metadata không đổi SAL ID. Không renumber vì sort lại year/title. Sau `SAL-9999`, ID có thể mở rộng tự nhiên thành `SAL-10000` mà không đổi ID cũ.
+
+Preprint/version of record/correction/retraction xử lý theo `CITATION_RULES.md` và `REGISTRY_RULES.md` để giữ provenance. Hai file có title gần giống không tự động là duplicate; version relationship phải được xác minh.
+
+## SOURCE_REGISTRY.csv — lớp chống trùng trước note
+
+`SOURCE_REGISTRY.csv` giải quyết khoảng trống mà `INDEX.md` và `notes.py new` không giải quyết được: một PDF có thể đã được đưa vào Drive nhưng chưa có note; cùng paper có thể được upload với tên file khác; DOI có thể thiếu; hoặc preprint/version of record có title gần nhau.
+
+Registry giữ các khóa chính:
+
+- exact `title` + machine `title_key`;
+- `year`;
+- `first_author` + `first_author_key`;
+- `doi` + normalized `doi_key`;
+- PMID/PMCID khi có;
+- journal/container;
+- publication type/status và version relation;
+- original filename;
+- canonical `pdf_filename` và `md_filename`;
+- `pdf_sha256` để bắt exact binary duplicate;
+- registry/note status và audit timestamps.
+
+### Thứ tự duplicate check
+
+1. DOI exact sau chuẩn hóa → hard duplicate candidate.
+2. PMID/PMCID exact → hard duplicate candidate khi áp dụng cùng publication.
+3. PDF SHA-256 exact → exact file duplicate.
+4. Exact title key + first author + cùng năm → strong duplicate candidate.
+5. Exact title key + năm cùng hoặc lệch ±1 → probable duplicate/version candidate.
+6. Fuzzy title rất gần + cùng first author/journal/locator → review thủ công; không auto-merge.
+
+Cùng DOI nhưng title khác là **identity conflict** và phải dừng intake để xác minh. Cùng title nhưng DOI khác không tự động là duplicate vì có thể là preprint, correction hoặc hai publication khác nhau.
+
+Chi tiết schema, normalization và trạng thái xem `REGISTRY_RULES.md`.
+
+## Workflow intake bắt buộc
+
+Khi nhận một PDF/source mới:
+
+1. Đọc bibliographic identity tối thiểu: exact title, first author, year, DOI/PMID nếu có.
+2. Tính SHA-256 của PDF khi làm việc với file local.
+3. Tìm duplicate/version candidate trong `SOURCE_REGISTRY.csv` **trước khi cấp SAL ID hoặc upload main PDF**.
+4. Nếu duplicate chắc chắn: dùng SAL ID hiện có, không tạo source mới.
+5. Nếu candidate mơ hồ: review version/metadata trước; chưa tạo active record mới.
+6. Nếu source mới: cấp SAL ID kế tiếp trong registry.
+7. Đổi main source thành `SAL-xxxx.pdf`, nhưng giữ `original_filename` trong registry.
+8. Tạo `SAL-xxxx.md` cùng ID, H1 exact title và citation block.
+9. Sau khi note tạo/soát, cập nhật `note_status`/`updated_at` trong registry.
+
+Registry là canonical cho **identity intake + file mapping**. Note là canonical cho **scientific content + full citation metadata**. `INDEX.md` là file dẫn xuất để browse. Nếu registry và note khác title/year/DOI, coi đó là conflict cần đối chiếu nguồn, không âm thầm chọn một bên.
 
 ## Citation metadata: chuẩn bị cho APA và các style khác
 
@@ -113,7 +172,7 @@ Không nâng `checked` chỉ vì file đủ mục hoặc script báo 0 warning.
 
 Yêu cầu khuyến nghị:
 
-> Đọc toàn văn tài liệu đính kèm và viết source note tiếng Việt theo NOTE_TEMPLATE.md, AGENTS.md và CITATION_RULES.md. Note phải tự đứng được: xác minh bibliographic identity và điền citation block đủ để xuất CSL; giữ đầy đủ luồng mẫu, unit of analysis, protocol, tool/version/threshold, bảng kết quả cần dùng lại, tử số/mẫu số, kết quả âm tính, kiểm tra số học, bất nhất nội tại, giới hạn và phần cần để tái lập. Không rút gọn Methods/Results thành abstract. Nếu thông tin không được nguồn báo cáo, ghi rõ `không báo cáo`. Nếu phát hiện bất nhất thì giữ nguyên số nguồn, tính lại và giữ `draft`.
+> Trước khi xử lý source, kiểm tra `SOURCE_REGISTRY.csv` theo DOI/title/first author/PDF hash để chống trùng và cấp SAL ID đúng. Sau đó đọc toàn văn tài liệu đính kèm và viết source note tiếng Việt theo NOTE_TEMPLATE.md, AGENTS.md, CITATION_RULES.md và REGISTRY_RULES.md. Note phải tự đứng được: xác minh bibliographic identity và điền citation block đủ để xuất CSL; giữ đầy đủ luồng mẫu, unit of analysis, protocol, tool/version/threshold, bảng kết quả cần dùng lại, tử số/mẫu số, kết quả âm tính, kiểm tra số học, bất nhất nội tại, giới hạn và phần cần để tái lập. Không rút gọn Methods/Results thành abstract. Nếu thông tin không được nguồn báo cáo, ghi rõ `không báo cáo`. Nếu phát hiện bất nhất thì giữ nguyên số nguồn, tính lại và giữ `draft`.
 
 Không dồn nhiều full-text vào một lượt để lấy tốc độ. Xử lý từng tài liệu hoàn chỉnh rồi chuyển tài liệu tiếp theo.
 
@@ -123,21 +182,25 @@ Python 3.10 trở lên:
 
 ```bash
 python -m pip install -r requirements.txt
+
+# Registry — chạy trên thư mục results đã sync/mount từ Drive
+python registry.py --registry results/SOURCE_REGISTRY.csv check
+python registry.py --registry results/SOURCE_REGISTRY.csv find \
+  --title "Exact source title" --year 2026 --first-author "Family, Given" --doi 10.xxxx/xxxxx
+python registry.py --registry results/SOURCE_REGISTRY.csv register \
+  --title "Exact source title" --year 2026 --first-author "Family, Given" \
+  --doi 10.xxxx/xxxxx --original-filename original.pdf
+
+# Note
 python notes.py new --title "Exact source title" --year 2026 --doi 10.xxxx/xxxxx --tags amr wgs
 python notes.py check
 python notes.py index
 python notes.py csl
 ```
 
-Kho ở nơi khác:
+`registry.py register` chuẩn hóa DOI/title/first author, có thể tính `pdf_sha256` nếu truyền `--pdf`, từ chối hard duplicate và dừng khi gặp probable duplicate/version candidate trừ khi đã review và dùng `--allow-candidate`.
 
-```bash
-python notes.py --notes /duong-dan/kho/MD check
-python notes.py --notes /duong-dan/kho/MD index
-python notes.py --notes /duong-dan/kho/MD csl --out /duong-dan/references.csl.json
-```
-
-`notes.py new` tự đồng bộ ID, H1 title, year và DOI vào khung citation; authors/container/volume/issue/page vẫn phải được MRLUAN xác minh và điền.
+`notes.py new` vẫn kiểm tra DOI/tiêu đề trong corpus MD. Khi dùng workflow registry-first, SAL ID trong MD/PDF phải khớp row đã đăng ký; không dùng `notes.py new` như cơ chế cấp ID độc lập nếu registry đã có dữ liệu.
 
 `notes.py check` cảnh báo khi:
 
@@ -158,12 +221,14 @@ Các cảnh báo là **heuristic QC**, không phải điểm khoa học. `0 warn
 
 ## Tổ chức 1.000 tài liệu
 
-Mỗi nguồn một `SAL-xxxx.md`; PDF tương ứng `SAL-xxxx.pdf`; phụ lục/data theo hậu tố chuẩn. Không tạo `final`, `final2`; sửa trực tiếp note hiện hành và giữ ID ổn định.
+Mỗi source active có một row trong `SOURCE_REGISTRY.csv`, một `SAL-xxxx.md` và tối đa một main `SAL-xxxx.pdf`; phụ lục/data theo hậu tố chuẩn. Không tạo `final`, `final2`; sửa trực tiếp note hiện hành và giữ ID ổn định.
 
-Sau mỗi đợt khoảng 10–20 nguồn, chọn 2–3 note để đọc ngược với PDF. Nếu phát hiện một kiểu mất thông tin hoặc lỗi bibliographic lặp lại, sửa `AGENTS.md`, `NOTE_TEMPLATE.md` hoặc `CITATION_RULES.md` trước khi tiếp tục. Chất lượng corpus được xây từ note chi tiết từng nguồn, không từ việc tạo đủ số lượng file.
+Sau mỗi đợt khoảng 10–20 nguồn, chạy registry check và chọn 2–3 note để đọc ngược với PDF. Nếu phát hiện một kiểu mất thông tin, lỗi bibliographic hoặc duplicate pattern lặp lại, sửa `AGENTS.md`, `NOTE_TEMPLATE.md`, `CITATION_RULES.md` hoặc `REGISTRY_RULES.md` trước khi tiếp tục. Chất lượng corpus được xây từ note chi tiết từng nguồn và identity sạch, không từ việc tạo đủ số lượng file.
 
 ## Đánh giá chất lượng thực
 
 Tạm đóng PDF và thử trả lời: nghiên cứu hỏi gì; lấy mẫu/dữ liệu thế nào; phương pháp có thể mô tả đủ để người khác hiểu không; kết quả nào với mẫu số nào; số liệu có tự khớp không; giới hạn nào quan trọng; dùng lại và tái tính được gì; và có thể xuất bibliographic record đúng để render APA/Vancouver/Chicago/IEEE hay không?
+
+Trước đó, cũng phải trả lời được: source này đã được đăng ký chưa; DOI/title/hash có trùng SAL nào không; main PDF và MD có cùng ID không; original filename có được truy vết trong registry không?
 
 Nếu phải mở PDF chỉ vì note đã bỏ mất thông tin mà nguồn có, bổ sung note. Nếu bản thân nguồn thiếu thông tin, note phải nói rõ phần thiếu đó.
