@@ -20,11 +20,22 @@ def doi_key(value):
     return re.sub(r'^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)', '', value.strip(), flags=re.I).lower()
 
 
-def headings(body):
+def headings(body, level=2):
     clean = re.sub(r'^(`{3,}|~{3,}).*?^\1\s*$', '', body, flags=re.M | re.S)
-    matches = list(re.finditer(r'^## (.+)$', clean, re.M))
+    marker = '#' * level
+    matches = list(re.finditer(rf'^{re.escape(marker)} (.+)$', clean, re.M))
     return [(m[1], clean[m.end():matches[i+1].start() if i+1 < len(matches) else len(clean)].strip())
             for i, m in enumerate(matches)]
+
+
+def word_count(text):
+    """Approximate Unicode word count for Vietnamese/English scientific prose."""
+    return len(re.findall(r'\b[^\W_]+(?:[-′’][^\W_]+)*\b', text, flags=re.UNICODE))
+
+
+def table_count(text):
+    """Count Markdown table separator rows, a useful proxy for reusable data tables."""
+    return len(re.findall(r'^\s*\|(?:\s*:?-{3,}:?\s*\|){2,}\s*$', text, flags=re.M))
 
 
 def load(path):
@@ -77,17 +88,46 @@ def scan(folder):
     return items, errors
 
 
-def content_warnings(body, template):
-    actual, expected = headings(body), headings(template)
+def content_warnings(body, template, data):
+    actual, expected = headings(body, 2), headings(template, 2)
     warnings = []
     if [h for h, _ in actual] != [h for h, _ in expected]:
-        warnings.append('Chưa đúng tám mục của NOTE_TEMPLATE.md')
+        warnings.append('Chưa đúng tám mục cấp ## của NOTE_TEMPLATE.md')
     originals = dict(expected)
     for heading, content in actual:
         if not content or content == originals.get(heading):
             warnings.append(f'{heading}: rỗng hoặc chưa thay hướng dẫn mẫu')
     if re.search(r'\[[^\]\n]+\](?!\()', body):
         warnings.append('Còn chỗ trong [ngoặc vuông]; kiểm tra placeholder hoặc ký hiệu hợp lệ')
+
+    if data['read_scope'] == 'full_text':
+        total = word_count(body)
+        if total < 1800:
+            warnings.append(f'full_text chỉ khoảng {total} từ; rà lại Methods/Results/Tables theo AGENTS.md (thường >=1800 từ cho nguồn nhiều dữ liệu)')
+
+        sections = dict(actual)
+        methods_results = ' '.join([
+            sections.get('3. Thiết kế và phương pháp', ''),
+            sections.get('4. Kết quả và dữ liệu cần giữ', '')
+        ])
+        mr_words = word_count(methods_results)
+        if mr_words < 900:
+            warnings.append(f'Mục 3–4 chỉ khoảng {mr_words} từ; chưa đủ chiều sâu để bảo toàn phương pháp và dữ liệu')
+
+        tables = table_count(body)
+        if tables < 2:
+            warnings.append(f'Chỉ phát hiện {tables} bảng Markdown; full_text thường cần bảng luồng/phương pháp và bảng dữ liệu dùng lại')
+
+        expected_h3 = [h for h, _ in headings(template, 3)]
+        actual_h3 = [h for h, _ in headings(body, 3)]
+        missing_h3 = [h for h in expected_h3 if h not in actual_h3]
+        if missing_h3:
+            warnings.append('Thiếu các tiểu mục bắt buộc của mẫu chi tiết: ' + '; '.join(missing_h3))
+
+        source_markers = len(re.findall(r'\b(?:trang|page|table|bảng|figure|hình|methods?|results?|supplement(?:ary)?)\b', body, flags=re.I))
+        if source_markers < 8:
+            warnings.append('Ít vị trí nguồn cụ thể; thêm trang/bảng/hình/mục để truy vết bằng chứng nhanh')
+
     return warnings
 
 
@@ -163,11 +203,11 @@ def main(argv=None):
             return 0
         warning_count = 0
         for path, data, body, _ in items:
-            warnings = content_warnings(body, template)
+            warnings = content_warnings(body, template, data)
             for warning in warnings:
                 print(f'CẦN XEM {path.name}: {warning}')
             warning_count += len(warnings)
-        print(f'{len(items)} note; {warning_count} điểm cần xem về hình thức. Không tự đánh giá chất lượng khoa học.')
+        print(f'{len(items)} note; {warning_count} điểm cần xem về cấu trúc/độ sâu. Không tự đánh giá tính đúng khoa học.')
         return 1 if warning_count else 0
     except (ValueError, TypeError, OSError, yaml.YAMLError) as error:
         print('LỖI:', error)
