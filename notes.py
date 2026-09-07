@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Create, check and index Markdown notes. MRLUAN/reader writes the content."""
+"""Create, check, index and export citation metadata from Markdown source notes."""
 import argparse
 from collections import Counter
+import json
 from pathlib import Path
 import re
 import os
@@ -14,10 +15,18 @@ FIELDS = {'id', 'year', 'doi', 'tags', 'read_scope', 'status'}
 SCOPES = {'full_text', 'partial', 'abstract'}
 STATUSES = {'draft', 'checked'}
 ID = re.compile(r'SAL-\d{4,}$')
+CITATION_RE = re.compile(
+    r'<!--\s*CITATION_METADATA_START\s*-->\s*```ya?ml\s*(.*?)\s*```\s*<!--\s*CITATION_METADATA_END\s*-->',
+    re.I | re.S,
+)
 
 
 def doi_key(value):
-    return re.sub(r'^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)', '', value.strip(), flags=re.I).lower()
+    return re.sub(r'^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)', '', str(value or '').strip(), flags=re.I).lower()
+
+
+def normalized_text(value):
+    return re.sub(r'\s+', ' ', str(value or '')).strip().casefold()
 
 
 def headings(body, level=2):
@@ -88,7 +97,85 @@ def scan(folder):
     return items, errors
 
 
-def content_warnings(body, template, data):
+def parse_citation(body):
+    match = CITATION_RE.search(body)
+    if not match:
+        return None, ['Thiếu block CITATION_METADATA_START/END']
+    try:
+        payload = yaml.safe_load(match.group(1))
+    except yaml.YAMLError as error:
+        return None, [f'Citation YAML không hợp lệ: {error}']
+    if not isinstance(payload, dict) or not isinstance(payload.get('citation'), dict):
+        return None, ['Citation block phải chứa mapping `citation:`']
+    return payload['citation'], []
+
+
+def citation_issues(data, body, title):
+    citation, errors = parse_citation(body)
+    warnings = []
+    if errors:
+        return citation, errors, warnings
+
+    for field in ('id', 'type', 'title'):
+        if not str(citation.get(field, '')).strip():
+            errors.append(f'citation.{field} bắt buộc')
+
+    if citation.get('id') != data['id']:
+        errors.append(f'citation.id phải khớp {data["id"]}')
+
+    if normalized_text(citation.get('title')) != normalized_text(title):
+        errors.append('citation.title phải khớp chính xác H1/exact source title')
+
+    authors = citation.get('author')
+    if not isinstance(authors, list) or not authors:
+        warnings.append('citation.author đang rỗng; chỉ chấp nhận nếu nguồn thực sự không có tác giả')
+    else:
+        for i, author in enumerate(authors, 1):
+            if not isinstance(author, dict):
+                errors.append(f'citation.author[{i}] phải là mapping')
+                continue
+            literal = str(author.get('literal', '')).strip()
+            family = str(author.get('family', '')).strip()
+            given = str(author.get('given', '')).strip()
+            if not literal and not family:
+                errors.append(f'citation.author[{i}] cần `family` hoặc `literal`')
+            if literal and (family or given):
+                warnings.append(f'citation.author[{i}] dùng corporate `literal`; không nên đồng thời có family/given')
+
+    issued = citation.get('issued')
+    issued_year = None
+    try:
+        parts = issued['date-parts']
+        if isinstance(parts, list) and parts and isinstance(parts[0], list) and parts[0]:
+            issued_year = parts[0][0]
+    except (TypeError, KeyError):
+        parts = None
+    if issued_year is None:
+        warnings.append('citation.issued chưa có năm; nếu nguồn có ngày xuất bản phải điền date-parts')
+    elif type(issued_year) is not int or not 1000 <= issued_year <= 9999:
+        errors.append('citation.issued.date-parts có năm không hợp lệ')
+    elif data['year'] is not None and issued_year != data['year']:
+        errors.append(f'citation issued year {issued_year} không khớp YAML year {data["year"]}')
+
+    citation_doi = doi_key(citation.get('DOI', ''))
+    yaml_doi = doi_key(data['doi'])
+    if citation_doi != yaml_doi:
+        errors.append('citation.DOI phải khớp YAML doi sau chuẩn hóa')
+
+    ctype = str(citation.get('type', '')).strip()
+    if ctype == 'article-journal':
+        if not str(citation.get('container-title', '')).strip():
+            warnings.append('Journal article thiếu citation.container-title')
+        if not any(str(citation.get(k, '')).strip() for k in ('volume', 'issue', 'page')):
+            warnings.append('Journal article chưa có volume/issue/page hoặc article number; kiểm tra version of record')
+
+    if re.search(r'\bTODO(?:_[A-Z_]+)?\b', yaml.safe_dump(citation, allow_unicode=True), re.I):
+        errors.append('Citation metadata còn TODO placeholder')
+
+    return citation, errors, warnings
+
+
+def content_warnings(body, template, data, title):
     actual, expected = headings(body, 2), headings(template, 2)
     warnings = []
     if [h for h, _ in actual] != [h for h, _ in expected]:
@@ -97,8 +184,13 @@ def content_warnings(body, template, data):
     for heading, content in actual:
         if not content or content == originals.get(heading):
             warnings.append(f'{heading}: rỗng hoặc chưa thay hướng dẫn mẫu')
+    if re.search(r'\bTODO(?:_[A-Z_]+)?\b', body):
+        warnings.append('Còn TODO placeholder')
     if re.search(r'\[[^\]\n]+\](?!\()', body):
         warnings.append('Còn chỗ trong [ngoặc vuông]; kiểm tra placeholder hoặc ký hiệu hợp lệ')
+
+    _, citation_errors, citation_warnings = citation_issues(data, body, title)
+    warnings.extend('Citation: ' + issue for issue in citation_errors + citation_warnings)
 
     if data['read_scope'] == 'full_text':
         total = word_count(body)
@@ -115,8 +207,8 @@ def content_warnings(body, template, data):
             warnings.append(f'Mục 3–4 chỉ khoảng {mr_words} từ; chưa đủ chiều sâu để bảo toàn phương pháp và dữ liệu')
 
         tables = table_count(body)
-        if tables < 2:
-            warnings.append(f'Chỉ phát hiện {tables} bảng Markdown; full_text thường cần bảng luồng/phương pháp và bảng dữ liệu dùng lại')
+        if tables < 3:
+            warnings.append(f'Chỉ phát hiện {tables} bảng Markdown; full_text chi tiết thường cần metadata/source table, methods/flow và data table')
 
         expected_h3 = [h for h, _ in headings(template, 3)]
         actual_h3 = [h for h, _ in headings(body, 3)]
@@ -124,8 +216,8 @@ def content_warnings(body, template, data):
         if missing_h3:
             warnings.append('Thiếu các tiểu mục bắt buộc của mẫu chi tiết: ' + '; '.join(missing_h3))
 
-        source_markers = len(re.findall(r'\b(?:trang|page|table|bảng|figure|hình|methods?|results?|supplement(?:ary)?)\b', body, flags=re.I))
-        if source_markers < 8:
+        source_markers = len(re.findall(r'\b(?:trang|page|table|bảng|figure|hình|methods?|results?|supplement(?:ary)?|data availability)\b', body, flags=re.I))
+        if source_markers < 10:
             warnings.append('Ít vị trí nguồn cụ thể; thêm trang/bảng/hình/mục để truy vết bằng chứng nhanh')
 
     return warnings
@@ -146,18 +238,50 @@ def index_text(items):
     return '\n'.join(lines) + '\n'
 
 
-def write_index(folder, items):
-    target = folder / 'INDEX.md'
+def atomic_write(target, text):
     if target.is_symlink():
-        raise ValueError('INDEX.md không được là symlink')
-    fd, name = tempfile.mkstemp(prefix='.index-', dir=folder)
+        raise ValueError(f'{target.name} không được là symlink')
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix='.' + target.stem + '-', dir=target.parent)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as handle:
-            handle.write(index_text(items))
+            handle.write(text)
         os.replace(name, target)
     finally:
         Path(name).unlink(missing_ok=True)
+
+
+def write_index(folder, items):
+    target = folder / 'INDEX.md'
+    atomic_write(target, index_text(items))
     return target
+
+
+def clean_csl(value):
+    if isinstance(value, dict):
+        cleaned = {k: clean_csl(v) for k, v in value.items()}
+        return {k: v for k, v in cleaned.items() if v not in ('', None, [], {})}
+    if isinstance(value, list):
+        cleaned = [clean_csl(v) for v in value]
+        return [v for v in cleaned if v not in ('', None, [], {})]
+    return value
+
+
+def write_csl(folder, items, output=None):
+    citations = []
+    errors = []
+    warnings = []
+    for path, data, body, title in items:
+        citation, c_errors, c_warnings = citation_issues(data, body, title)
+        errors.extend(f'{path.name}: {e}' for e in c_errors)
+        warnings.extend(f'{path.name}: {w}' for w in c_warnings)
+        if citation is not None and not c_errors:
+            citations.append(clean_csl(citation))
+    if errors:
+        raise ValueError('Không xuất CSL vì citation metadata có lỗi:\n' + '\n'.join(errors))
+    target = output or (folder / 'references.csl.json')
+    atomic_write(target, json.dumps(citations, ensure_ascii=False, indent=2) + '\n')
+    return target, warnings
 
 
 def main(argv=None):
@@ -171,6 +295,8 @@ def main(argv=None):
     new.add_argument('--tags', nargs='*', default=[])
     sub.add_parser('check')
     sub.add_parser('index')
+    csl = sub.add_parser('csl')
+    csl.add_argument('--out', type=Path)
     args = parser.parse_args(argv)
     try:
         if not args.notes.exists() and args.command != 'new':
@@ -192,22 +318,32 @@ def main(argv=None):
                 raise ValueError('DOI/tiêu đề đã có; mở note hiện hành để rà trùng')
             next_id = 1 + max([int(d['id'][4:]) for _, d, _, _ in items], default=0)
             data = dict(id=f'SAL-{next_id:04d}', year=args.year, doi=doi, tags=list(dict.fromkeys(args.tags)), read_scope='partial', status='draft')
-            body = template.replace('# [Tiêu đề tài liệu]', '# ' + title, 1)
+            body = template.replace('SAL-0001', data['id']).replace('TODO_EXACT_SOURCE_TITLE', title)
+            if args.year is not None:
+                body = body.replace('- [null]', f'- [{args.year}]', 1)
+            if doi:
+                body = body.replace('  DOI: ""', f'  DOI: "{doi}"', 1)
             path = args.notes / (data['id'] + '.md')
             with path.open('x', encoding='utf-8') as handle:
                 handle.write('---\n' + yaml.safe_dump(data, allow_unicode=True, sort_keys=False) + '---\n\n' + body)
-            print(f'Đã tạo khung: {path}. Chưa có phân tích; viết theo AGENTS.md.')
+            print(f'Đã tạo khung: {path}. Điền citation metadata và nội dung theo AGENTS.md/CITATION_RULES.md.')
             return 0
         if args.command == 'index':
             print(write_index(args.notes, items))
             return 0
+        if args.command == 'csl':
+            target, csl_warnings = write_csl(args.notes, items, args.out)
+            for warning in csl_warnings:
+                print('CẦN XEM CITATION:', warning)
+            print(target)
+            return 1 if csl_warnings else 0
         warning_count = 0
-        for path, data, body, _ in items:
-            warnings = content_warnings(body, template, data)
+        for path, data, body, title in items:
+            warnings = content_warnings(body, template, data, title)
             for warning in warnings:
                 print(f'CẦN XEM {path.name}: {warning}')
             warning_count += len(warnings)
-        print(f'{len(items)} note; {warning_count} điểm cần xem về cấu trúc/độ sâu. Không tự đánh giá tính đúng khoa học.')
+        print(f'{len(items)} note; {warning_count} điểm cần xem về cấu trúc/độ sâu/citation. Không tự đánh giá tính đúng khoa học.')
         return 1 if warning_count else 0
     except (ValueError, TypeError, OSError, yaml.YAMLError) as error:
         print('LỖI:', error)
