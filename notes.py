@@ -289,6 +289,7 @@ def main(argv=None):
     parser.add_argument('--notes', type=Path, default=ROOT / 'results/MD')
     sub = parser.add_subparsers(dest='command', required=True)
     new = sub.add_parser('new')
+    new.add_argument('--id', help='SAL ID đã được registry cấp, ví dụ SAL-0001')
     new.add_argument('--title', required=True)
     new.add_argument('--year', type=int)
     new.add_argument('--doi', default='')
@@ -316,8 +317,16 @@ def main(argv=None):
             doi = doi_key(args.doi)
             if any((doi and doi_key(d['doi']) == doi) or title.casefold() == t.casefold() for _, d, _, t in items):
                 raise ValueError('DOI/tiêu đề đã có; mở note hiện hành để rà trùng')
-            next_id = 1 + max([int(d['id'][4:]) for _, d, _, _ in items], default=0)
-            data = dict(id=f'SAL-{next_id:04d}', year=args.year, doi=doi, tags=list(dict.fromkeys(args.tags)), read_scope='partial', status='draft')
+            if args.id:
+                if not ID.fullmatch(args.id):
+                    raise ValueError('--id phải dạng SAL-0001 trở lên')
+                if any(d['id'] == args.id for _, d, _, _ in items):
+                    raise ValueError(f'ID {args.id} đã có note')
+                note_id = args.id
+            else:
+                next_id = 1 + max([int(d['id'][4:]) for _, d, _, _ in items], default=0)
+                note_id = f'SAL-{next_id:04d}'
+            data = dict(id=note_id, year=args.year, doi=doi, tags=list(dict.fromkeys(args.tags)), read_scope='partial', status='draft')
             body = template.replace('SAL-0001', data['id']).replace('TODO_EXACT_SOURCE_TITLE', title)
             if args.year is not None:
                 body = body.replace('- [null]', f'- [{args.year}]', 1)
@@ -326,7 +335,10 @@ def main(argv=None):
             path = args.notes / (data['id'] + '.md')
             with path.open('x', encoding='utf-8') as handle:
                 handle.write('---\n' + yaml.safe_dump(data, allow_unicode=True, sort_keys=False) + '---\n\n' + body)
-            print(f'Đã tạo khung: {path}. Điền citation metadata và nội dung theo AGENTS.md/CITATION_RULES.md.')
+            if args.id:
+                print(f'Đã tạo khung: {path} theo SAL ID do registry cấp. Điền citation metadata và nội dung theo AGENTS.md/CITATION_RULES.md/REGISTRY_RULES.md.')
+            else:
+                print(f'Đã tạo khung: {path}. Chưa truyền --id; chỉ dùng chế độ tự cấp ID khi không vận hành registry-first.')
             return 0
         if args.command == 'index':
             print(write_index(args.notes, items))
