@@ -64,6 +64,8 @@ Chỉ dùng một trong năm giá trị:
 - `review_pooled_estimates`: systematic review/meta-analysis; estimate phải đi cùng CI/heterogeneity/subgroup.
 - `review_summary_only`: narrative/systematic descriptive review không có pooled effect phù hợp.
 
+Không được biến selected isolates/genomes thành population prevalence; không biến experimental transfer parameter thành natural prevalence; không dùng review descriptive như pooled estimate.
+
 ## matrix_status
 
 - `draft`: row đang xây/soát.
@@ -82,6 +84,18 @@ Không được để script tự nâng từ `draft` sang `checked_against_check
 - `do_not_conclude` khóa các overclaim thường gặp: prevalence từ selected isolates, gene→phenotype, gene→virulence, relatedness→direct transmission, association→causality.
 
 Không “làm sạch” matrix bằng cách xóa conflict vì conflict chính là metadata quan trọng khi synthesis.
+
+## Ranh giới cell và semantic domain QC
+
+Matrix là bảng synthesis, **không phải một bản sao ghép các section Markdown**. Mỗi cell phải kết thúc đúng ở ranh giới nội dung của field đó.
+
+- Không được để heading `##`/`###` của note lọt vào bất kỳ synthesis cell nào. Ví dụ `arithmetic_internal_consistency` phải dừng trước `## 5`, `main_limitations` phải dừng trước `## 6`, `do_not_conclude` phải dừng trước `## 7`, và `evidence_reuse_decision` phải dừng trước `## 8`.
+- Không dùng keyword-only extraction để tự gán domain. Một dòng có chữ `tetracycline` không tự động là `amr_gene_summary`; một dòng có `ST45` trong short-amplicon BLAST không tự động là MLST evidence.
+- `serovar_summary`, `ast_summary`, `amr_gene_summary`, `virulence_summary` và `genomics_mlst_plasmid_phylogeny_summary` phải được phân loại theo **ý nghĩa khoa học của dữ liệu trong checked note**, không chỉ theo token match.
+- Nếu domain không được nghiên cứu hoặc không có dữ liệu đủ tin cậy, để trống và giữ limitation/negative finding ở field phù hợp; không lấp ô bằng dữ liệu từ domain khác.
+- Sau khi sửa extraction logic hoặc note template, phải chạy lại heading-leak guard và row-level semantic review trước khi nâng `matrix_status`.
+
+`evidence_matrix.py` coi Markdown heading trong synthesis cell là lỗi cấu trúc. Validator này chỉ phát hiện lỗi có thể máy hóa; semantic domain classification vẫn cần MRLUAN review.
 
 ## Staleness và cập nhật
 
@@ -109,6 +123,8 @@ Batch mới phải cập nhật matrix sau registry + note + verification, khôn
 7. selected genomic set không bị biến thành prevalence;
 8. source discrepancy vẫn còn trong row;
 9. review/meta-analysis được phân biệt với primary study;
-10. experimental transfer parameter không bị diễn giải như natural infection risk.
+10. experimental transfer parameter không bị diễn giải như natural infection risk;
+11. synthesis cells không chứa leaked `##`/`###` headings;
+12. domain summaries không chứa dữ liệu của domain khác chỉ vì keyword match.
 
-`evidence_matrix.py` chỉ kiểm tra schema/provenance/consistency. Nó không thay thế source-level scientific review.
+`evidence_matrix.py` chỉ kiểm tra schema/provenance/consistency/structural leakage. Nó không thay thế source-level scientific review.
