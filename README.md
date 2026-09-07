@@ -1,56 +1,88 @@
 # Scientific Notes Simple
 
-Một mẫu note cho 1.000 tài liệu. Sáu trường YAML; nội dung khoa học viết trực tiếp bằng Markdown.
+Một mẫu note cho 1.000 tài liệu. Sáu trường YAML; nội dung khoa học viết trực tiếp bằng Markdown. Mục tiêu của dự án không phải tạo bản tóm tắt ngắn, mà tạo **source note tự đứng được** để hiểu, đánh giá, trích dẫn và tái tính bằng chứng mà không phải mở lại PDF cho những chi tiết tác giả đã báo cáo.
 
-## Thiết kế mới
+## Thiết kế
 
-Đây là gói viết lại từ đầu, không nâng cấp kiến trúc 9.1. Bỏ schema JSON, Evidence/Claim ID, hash/revision engine, điểm QC/relevance, cổng approve, YAML kết quả lồng nhiều tầng và phụ lục dữ liệu tự sinh. Mục tiêu là người đọc dùng được note.
+Đây là gói viết lại từ đầu, không nâng cấp kiến trúc 9.1. Bỏ schema JSON, Evidence/Claim ID, hash/revision engine, điểm QC/relevance, cổng approve, YAML kết quả lồng nhiều tầng và phụ lục dữ liệu tự sinh. Mục tiêu là nội dung khoa học có thể dùng được.
 
 | Thành phần | Vai trò |
 | --- | --- |
-| AGENTS.md | Hướng dẫn MRLUAN đọc nguồn và viết nội dung |
-| NOTE_TEMPLATE.md | Mẫu duy nhất, sáu trường YAML và tám mục cố định |
+| AGENTS.md | Quy tắc MRLUAN đọc nguồn, bảo toàn dữ liệu, phản biện và QC |
+| NOTE_TEMPLATE.md | Mẫu duy nhất: sáu trường YAML, tám mục cấp `##`, các tiểu mục chi tiết bắt buộc |
 | examples/SAL-0001.md | Note đã điền trên bài Neuert và cộng sự (2018), kèm nguồn và giới hạn đọc |
-| notes.py | Tạo khung, kiểm tra hình thức, lập mục lục |
+| notes.py | Tạo khung, kiểm tra cấu trúc/độ sâu, lập mục lục |
 | requirements.txt | Một dependency: PyYAML |
 | PROJECT.yaml | Ánh xạ canonical giữa GitHub, Google Drive và vai trò MRLUAN |
 
-Script không tự viết phân tích, không gọi LLM, không đọc PDF tự động. Chất lượng nằm ở quá trình đọc/viết theo AGENTS và note mẫu. Có thể dùng bộ này ngay trong ChatGPT/Claude/Codex với tài liệu đính kèm; Python chỉ giúp quản lý tệp.
+Script không tự viết phân tích, không gọi LLM và không đọc PDF tự động. `notes.py check` chỉ kiểm tra cấu trúc và các dấu hiệu note quá mỏng; tính đúng khoa học vẫn do MRLUAN đối chiếu nguồn.
 
 ## Triển khai canonical
 
-- Vai trò ghi và soát scientific note: **MRLUAN**. Mọi attribution về người/agent thực hiện dùng tên này hoặc tên người soát cụ thể.
-- Mã nguồn, template, hướng dẫn và cấu hình: GitHub `https://github.com/mrluanresearch/Scientific_Notes_Simple`.
+- Vai trò ghi và soát scientific note: **MRLUAN**.
+- Mã nguồn, template, hướng dẫn và cấu hình: `https://github.com/mrluanresearch/Scientific_Notes_Simple`.
 - Dữ liệu nghiên cứu và kết quả: Google Drive root `https://drive.google.com/drive/folders/1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_`.
-- Cấu trúc Drive: `results/MD/` chứa note Markdown và `INDEX.md`; `results/PDF/` chứa PDF nguồn.
-- `results/` bị loại khỏi Git bằng `.gitignore`; không đưa corpus MD/PDF lên GitHub. Ngược lại, không dùng Drive để lưu bản canonical của mã nguồn.
-- Khi làm việc trên máy có Drive được đồng bộ/mount, trỏ `notes.py --notes` tới thư mục Drive `results/MD`. Script không tự upload và không chứa credential.
+- `results/MD/`: note Markdown + `INDEX.md`.
+- `results/PDF/`: PDF nguồn canonical.
+- `results/` bị loại khỏi Git; corpus MD/PDF không lên GitHub. Drive không giữ bản canonical của source code.
 
-Bài mẫu giữ `draft` dù đã đọc toàn văn: việc tính lại phát hiện một hàng bảng nguồn có tổng không khớp cỡ mẫu. Note chỉ rõ phép tính, vị trí nguồn và phần có thể dùng lại; không tự sửa dữ liệu hay giấu bất nhất để đạt trạng thái đẹp.
+## Tiêu chuẩn note chi tiết
+
+Một `full_text` note phải giữ đủ thông tin để trả lời, không cần mở lại PDF chỉ vì note đã bỏ mất chi tiết:
+
+1. Nghiên cứu hỏi gì, trên quần thể/dữ liệu nào và trong bối cảnh nào?
+2. Luồng mẫu/dữ liệu từ đầu tới tập phân tích là bao nhiêu ở từng bước? Unit là farm, flock, bird, sample, isolate, genome hay study?
+3. Phương pháp thực hiện cụ thể ra sao: culture/enrichment, AST, PCR, primer, cycling, WGS platform, reference genome, tool/database/version, identity/coverage/SNP threshold, statistical model?
+4. Kết quả chính có tử số/mẫu số, đơn vị, CI/p-value và phân tầng nào? Kết quả âm tính/ngoại lệ nào làm thay đổi diễn giải?
+5. Abstract, Results, Table và Figure có khớp nhau không? MRLUAN tính lại được gì và có bất nhất nào?
+6. Tác giả diễn giải gì, nhưng bằng chứng thực sự chỉ hỗ trợ tới đâu?
+7. Có thể dùng kết quả nào trực tiếp cho luận án, kết quả nào phải cảnh báo, và cần supplement/raw data nào để tái lập sâu hơn?
+
+Với bài full-text nhiều phương pháp/kết quả, note thường khoảng **1.800–3.500 từ tiếng Việt chưa tính bảng**; systematic review/meta-analysis thường **2.000–4.000 từ**. Đây là chuẩn biên tập, không phải quota: nguồn ngắn có thể ngắn hơn, nhưng không được cắt bỏ dữ liệu để đạt sự ngắn gọn.
+
+### Quy tắc bảo toàn thông tin
+
+- Không thay Methods/Results bằng abstract.
+- Không ghi `xem Table X trong PDF` nếu dữ liệu bảng đó cần cho luận án; chép lại bảng con cần dùng vào MD.
+- Prevalence/proportion phải ưu tiên `numerator/denominator`, không chỉ `%`.
+- AST phải giữ panel và concentration/breakpoint/standard khi nguồn có.
+- PCR phải giữ target/primer/product size và condition quan trọng khi có.
+- WGS phải giữ tool/database/version/threshold/reference/accession khi có.
+- Meta-analysis phải giữ search strategy, study count, model, heterogeneity, subgroup, risk-of-bias và sensitivity/publication-bias results khi có.
+- `không báo cáo` là thông tin quan trọng; không im lặng bỏ trống và không tự thay bằng thông lệ.
+- Gene presence không tự chứng minh phenotype/virulence expression; phylogenetic relatedness không tự chứng minh direct transmission; association không tự chứng minh causality.
+- Nếu số liệu nguồn không khớp, giữ nguyên số gốc, ghi phép tính và vị trí từng con số. Không âm thầm sửa để làm note “sạch”.
 
 ## Mẫu thống nhất
 
-YAML chỉ giữ `id`, `year`, `doi`, `tags`, `read_scope`, `status`. Tên bài và trích dẫn đầy đủ nằm trong thân note. Không lưu kết quả, phương pháp, appraisal hoặc claim vào YAML.
+YAML chỉ giữ `id`, `year`, `doi`, `tags`, `read_scope`, `status`. Tên bài và toàn bộ nội dung khoa học nằm trong thân note.
 
-- id: SAL-0001 đến SAL-1000 và có thể mở rộng; filename khớp ID.
-- year: năm xuất bản, chưa biết để null; doi: chưa có để chuỗi rỗng.
-- tags: 3–6 chủ đề ổn định, chữ thường không dấu; ví dụ amr, wgs, sampling, genotype-phenotype, one-health. Không dùng mười cách viết cho cùng chủ đề.
-- read_scope: full_text, partial hoặc abstract; phần chưa đọc/phụ lục chưa có giải thích ở mục 1.
-- status: draft hoặc checked. checked chỉ nói đã soát theo phạm vi khai báo; tên MRLUAN hoặc người thực hiện ở mục 1. Script không nâng trạng thái.
+- `id`: SAL-0001 trở đi; filename khớp ID.
+- `year`: năm xuất bản hoặc `null`.
+- `doi`: DOI chuẩn hóa; chưa có dùng `""`.
+- `tags`: 3–6 tag chữ thường không dấu.
+- `read_scope`: `full_text`, `partial`, `abstract`.
+- `status`: `draft`, `checked`.
 
-Tám mục giữ nguyên tên và thứ tự: tài liệu/phạm vi; câu hỏi/đóng góp; phương pháp; kết quả/dữ liệu; diễn giải/phản biện; giá trị cho luận án; dùng lại/phần thiếu; đoạn tổng hợp. Có thể thêm tiêu đề cấp ba bên trong từng mục. Với loại nguồn khác nhau, thay nội dung cho phù hợp, giữ khung chung.
+Tám mục cấp `##` giữ nguyên tên và thứ tự: tài liệu/phạm vi; câu hỏi/đóng góp; phương pháp; kết quả/dữ liệu; diễn giải/phản biện; giá trị cho luận án; dùng lại/phần thiếu; đoạn tổng hợp. `NOTE_TEMPLATE.md` định nghĩa các tiểu mục `###` bên trong để buộc bảo toàn chi tiết.
+
+## Trạng thái
+
+`draft` khi note đang viết, còn bất nhất, thiếu supplement/raw data quan trọng hoặc còn kết quả trọng yếu chưa xác minh. `checked` chỉ có nghĩa MRLUAN/người đọc đã đối chiếu các thông tin trung tâm trong phạm vi đọc được khai báo; không ngụ ý peer review độc lập.
+
+Không nâng `checked` chỉ vì file đủ mục hoặc script báo 0 warning.
 
 ## Cách dùng với MRLUAN
 
-Gửi AGENTS.md, NOTE_TEMPLATE.md, note mẫu và một tài liệu thật. Có thể dùng yêu cầu:
+Yêu cầu khuyến nghị:
 
-> Đọc tài liệu đính kèm và viết một source note tiếng Việt theo NOTE_TEMPLATE.md, tuân thủ AGENTS.md. Dùng note mẫu để hiểu độ cụ thể cần đạt; không sao chép dữ liệu của bài mẫu. Dành phần lớn nội dung cho thiết kế, dữ liệu, kết quả và phản biện. Giữ các bảng cần dùng lại ngay trong MD; ghi vị trí nguồn, mẫu số, đơn vị và phần chưa được tác giả báo cáo. Hoàn thiện từng tài liệu trước khi chuyển tài liệu kế tiếp. Chưa đủ nguồn thì ghi rõ và giữ draft; không viết dài bằng suy đoán.
+> Đọc toàn văn tài liệu đính kèm và viết source note tiếng Việt theo NOTE_TEMPLATE.md và AGENTS.md. Note phải tự đứng được: giữ đầy đủ luồng mẫu, unit of analysis, protocol, tool/version/threshold, bảng kết quả cần dùng lại, tử số/mẫu số, kết quả âm tính, kiểm tra số học, bất nhất nội tại, giới hạn và phần cần để tái lập. Không rút gọn Methods/Results thành abstract. Nếu thông tin không được nguồn báo cáo, ghi rõ `không báo cáo`. Nếu phát hiện bất nhất thì giữ nguyên số nguồn, tính lại và giữ `draft`.
 
-Không dồn 1.000 toàn văn vào một lượt rồi yêu cầu tóm tắt hàng loạt. Bắt đầu với khoảng 10 nguồn khác loại để điều chỉnh mẫu bằng chất lượng note thực; sau đó xử lý theo đợt khoảng 20. Đây là cách tổ chức công việc, không phải cổng xin phê duyệt. Trong một đợt vẫn viết lần lượt từng note để không cắt ngắn nội dung vì giới hạn đầu ra.
+Không dồn nhiều full-text vào một lượt để lấy tốc độ. Xử lý từng tài liệu hoàn chỉnh rồi chuyển tài liệu tiếp theo.
 
 ## Chạy công cụ
 
-Python 3.10 trở lên. Chạy từ thư mục gốc:
+Python 3.10 trở lên:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -59,33 +91,33 @@ python notes.py check
 python notes.py index
 ```
 
-`new` tạo SAL-0001.md hoặc ID tiếp theo, từ chối DOI/tiêu đề đã có và không ghi đè note. Điền note bằng MRLUAN/người đọc rồi `check`; sửa các chỗ cần xem và chạy `index` sau mỗi đợt. Có thể thêm `--doi` khi tạo.
-
-Kho ở nơi khác: đặt `--notes` trước tên lệnh. Ví dụ:
+Kho ở nơi khác:
 
 ```bash
 python notes.py --notes /duong-dan/kho/MD check
 python notes.py --notes /duong-dan/kho/MD index
 ```
 
-INDEX.md được dựng lại từ các note; không sửa tay. Các note draft vẫn có trong mục lục để không mất việc đang làm. Nếu YAML hỏng hoặc DOI trùng, script báo lỗi để sửa trước khi lập mục lục. `check` có thể nhắc nhầm một ký hiệu trong ngoặc vuông là placeholder; người đọc quyết định. Không lấy kết quả check làm thang chất lượng khoa học.
+`notes.py check` cảnh báo khi:
+
+- sai tám mục cấp `##`;
+- còn placeholder;
+- note `full_text` quá ngắn;
+- tổng nội dung mục 3–4 quá mỏng;
+- thiếu bảng Markdown cần cho dữ liệu tái sử dụng;
+- thiếu các tiểu mục chi tiết của template;
+- thiếu dấu vết vị trí nguồn.
+
+Các cảnh báo này là **heuristic QC**, không phải điểm khoa học. `0 warnings` không chứng minh số liệu đúng; vẫn phải đối chiếu PDF.
 
 ## Tổ chức 1.000 tài liệu
 
-Mỗi nguồn một tệp `SAL-xxxx.md`, sửa trực tiếp bản hiện hành; không tạo final/final2. PDF tương ứng là `SAL-xxxx.pdf`; phụ lục PDF thêm hậu tố `-supp-01`. Không đổi ID khi đổi tiêu đề. Chỉ dùng một người/tiến trình cấp ID trong cùng thư mục; khi tạo trùng cùng lúc, chương trình từ chối ghi đè.
+Mỗi nguồn một `SAL-xxxx.md`; PDF tương ứng `SAL-xxxx.pdf`; phụ lục PDF thêm `-supp-01`. Không tạo `final`, `final2`; sửa trực tiếp note hiện hành và giữ ID ổn định.
 
-Đặt tất cả MD và INDEX.md trong `results/MD`; PDF nguồn trong `results/PDF`. Mục lục có ID, năm, tiêu đề, DOI, chủ đề, phạm vi đọc và trạng thái. Có thể tìm theo tag/DOI/từ khóa ngay trên mục lục và toàn văn note; chưa cần database.
-
-Google Drive chỉ lưu nội dung `results/`: MD/PDF. Mã nguồn, mẫu, hướng dẫn và cấu hình remote ở GitHub. Gói không có chức năng upload, tài khoản hoặc secrets. Nếu cần bản PDF của note, xuất từ trình đọc Markdown; không bổ sung một renderer riêng ở giai đoạn này.
-
-Không chạy script cũ trên kho mới. Giữ dữ liệu cũ để đối chiếu; chuyển từng note có giá trị bằng cách giữ văn bản/số liệu/nguồn, đưa vào tám mục và sáu trường mới. Không nhập hàng loạt YAML cũ sang cấu trúc lồng tầng tương đương. Với ID cũ cần truy vết, ghi một dòng ở mục 1.
+Sau mỗi đợt khoảng 10–20 nguồn, chọn 2–3 note để đọc ngược với PDF. Nếu phát hiện một kiểu mất thông tin lặp lại, sửa `AGENTS.md` và `NOTE_TEMPLATE.md` trước khi tiếp tục. Chất lượng corpus được xây từ note chi tiết từng nguồn, không từ việc tạo đủ số lượng file.
 
 ## Đánh giá chất lượng thực
 
-Tạm đóng PDF và thử năm câu hỏi: nghiên cứu hỏi gì; làm trên ai/bằng dữ liệu nào; kết quả cụ thể và mẫu số là gì; kết luận bị giới hạn bởi điều gì; dùng vào luận án và tính/kiểm tra lại được phần nào?
+Tạm đóng PDF và thử trả lời: nghiên cứu hỏi gì; lấy mẫu/dữ liệu thế nào; phương pháp có thể mô tả đủ để người khác hiểu không; kết quả nào với mẫu số nào; số liệu có tự khớp không; giới hạn nào quan trọng; dùng lại và tái tính được gì?
 
-Nếu phải mở PDF chỉ vì note bỏ mất một thông tin quan trọng đã có trong nguồn, bổ sung note. Nếu bản thân nguồn không có thông tin thì nêu rõ phần thiếu. Kiểm tra phần trọng yếu với nguồn trước khi dùng vào bản thảo. Một note dài nhưng không trả lời được năm câu hỏi trên vẫn chưa đạt.
-
-Các phép thử quản lý 1.000 tệp chỉ đánh giá khả năng tạo/đọc/index, không đại diện cho chất lượng 1.000 tài liệu khoa học. Bài mẫu là một ví dụ có giới hạn đọc được khai báo; cần đối chiếu thêm trên những loại nguồn thực tế của người dùng.
-
-Đã chạy kiểm tra trên Python 3.12.13 và PyYAML 6.0.3: UTF-8, từ chối DOI/tiêu đề trùng, giữ nguyên note và trạng thái, bảo toàn mục lục khi YAML lỗi, và lập đúng 1.000 hàng mục lục từ 1.000 tệp giả lập. Dữ liệu giả lập không nằm trong gói.
+Nếu phải mở PDF chỉ vì note đã bỏ mất thông tin mà nguồn có, bổ sung note. Nếu bản thân nguồn thiếu thông tin, note phải nói rõ phần thiếu đó.
