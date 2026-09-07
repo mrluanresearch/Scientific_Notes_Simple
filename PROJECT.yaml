@@ -1,0 +1,19 @@
+project: Scientific_Notes_Simple
+agent_role: MRLUAN
+github:
+  repository: mrluanresearch/Scientific_Notes_Simple
+  url: https://github.com/mrluanresearch/Scientific_Notes_Simple
+  responsibility: source-code-templates-guidance-config
+google_drive:
+  root_id: 1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_
+  root_url: https://drive.google.com/drive/folders/1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_
+  results_id: 1gHgfn0va4LuKv1PISHUDg9vXtUr10dp2
+  md_id: 1OVHWYowFWGVmKBkF52az7TiCmpcpGjEr
+  pdf_id: 181IxfbflLh8Wg_wWaEzBO2Dkb7IrA-Kn
+  responsibility: research-data-and-results
+layout:
+  markdown: results/MD
+  pdf: results/PDF
+policy:
+  results_on_github: false
+  source_on_drive: false
