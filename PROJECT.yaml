@@ -57,5 +57,8 @@ policy:
   evidence_matrix_checked_requires_checked_note: true
   evidence_matrix_note_sha_staleness_guard: true
   evidence_matrix_update_in_place: true
+  evidence_matrix_heading_leak_forbidden: true
+  evidence_matrix_semantic_domain_review_required: true
+  evidence_matrix_full_close_requires_all_checked: true
   results_on_github: false
   source_on_drive: false
