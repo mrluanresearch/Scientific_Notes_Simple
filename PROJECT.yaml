@@ -8,12 +8,25 @@ google_drive:
   root_id: 1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_
   root_url: https://drive.google.com/drive/folders/1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_
   results_id: 1gHgfn0va4LuKv1PISHUDg9vXtUr10dp2
+  registry_id: 1NGkn_Xp3_5YiYDvsLBXYZsVGGM06TVvA
+  registry_url: https://drive.google.com/file/d/1NGkn_Xp3_5YiYDvsLBXYZsVGGM06TVvA/view?usp=drivesdk
   md_id: 1OVHWYowFWGVmKBkF52az7TiCmpcpGjEr
   pdf_id: 181IxfbflLh8Wg_wWaEzBO2Dkb7IrA-Kn
-  responsibility: research-data-and-results
+  responsibility: research-data-results-and-source-registry
 layout:
+  registry: results/SOURCE_REGISTRY.csv
   markdown: results/MD
   pdf: results/PDF
+naming:
+  source_id: SAL-xxxx
+  main_pdf: SAL-xxxx.pdf
+  main_note: SAL-xxxx.md
+  supplement: SAL-xxxx-supp-NN.ext
+  dataset: SAL-xxxx-data-NN.ext
+  protocol: SAL-xxxx-protocol-NN.ext
+  code_snapshot: SAL-xxxx-code-NN.ext
 policy:
+  registry_first: true
+  duplicate_check_before_id: true
   results_on_github: false
   source_on_drive: false
