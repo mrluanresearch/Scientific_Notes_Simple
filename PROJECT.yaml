@@ -10,11 +10,14 @@ google_drive:
   results_id: 1gHgfn0va4LuKv1PISHUDg9vXtUr10dp2
   registry_id: 1NGkn_Xp3_5YiYDvsLBXYZsVGGM06TVvA
   registry_url: https://drive.google.com/file/d/1NGkn_Xp3_5YiYDvsLBXYZsVGGM06TVvA/view?usp=drivesdk
+  verification_id: 1QWop52cRWDx_V2yM-foqw7ttznKYbXlD
+  verification_url: https://drive.google.com/file/d/1QWop52cRWDx_V2yM-foqw7ttznKYbXlD/view?usp=drivesdk
   md_id: 1OVHWYowFWGVmKBkF52az7TiCmpcpGjEr
   pdf_id: 181IxfbflLh8Wg_wWaEzBO2Dkb7IrA-Kn
-  responsibility: research-data-results-and-source-registry
+  responsibility: research-data-results-source-registry-and-verification-log
 layout:
   registry: results/SOURCE_REGISTRY.csv
+  verification: results/SOURCE_VERIFICATION.csv
   markdown: results/MD
   pdf: results/PDF
 naming:
@@ -29,6 +32,7 @@ rules:
   citation: CITATION_RULES.md
   registry: REGISTRY_RULES.md
   drive_write: DRIVE_WRITE_RULES.md
+  verification: VERIFICATION_RULES.md
 policy:
   registry_first: true
   duplicate_check_before_id: true
@@ -37,5 +41,8 @@ policy:
   duplicate_canonical_filenames_forbidden: true
   post_write_inventory_required: true
   drive_write_idempotent: true
+  checked_requires_source_verification: true
+  checked_allows_documented_source_discrepancies: true
+  verification_log_required_for_checked: true
   results_on_github: false
   source_on_drive: false
