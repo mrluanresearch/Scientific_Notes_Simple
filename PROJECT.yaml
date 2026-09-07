@@ -12,12 +12,15 @@ google_drive:
   registry_url: https://drive.google.com/file/d/1NGkn_Xp3_5YiYDvsLBXYZsVGGM06TVvA/view?usp=drivesdk
   verification_id: 1QWop52cRWDx_V2yM-foqw7ttznKYbXlD
   verification_url: https://drive.google.com/file/d/1QWop52cRWDx_V2yM-foqw7ttznKYbXlD/view?usp=drivesdk
+  evidence_matrix_id: 1alTLWdcY_6VRwqasx3m2xdwEIU9gMikW
+  evidence_matrix_url: https://drive.google.com/file/d/1alTLWdcY_6VRwqasx3m2xdwEIU9gMikW/view?usp=drivesdk
   md_id: 1OVHWYowFWGVmKBkF52az7TiCmpcpGjEr
   pdf_id: 181IxfbflLh8Wg_wWaEzBO2Dkb7IrA-Kn
-  responsibility: research-data-results-source-registry-and-verification-log
+  responsibility: research-data-results-source-registry-verification-and-evidence-matrix
 layout:
   registry: results/SOURCE_REGISTRY.csv
   verification: results/SOURCE_VERIFICATION.csv
+  evidence_matrix: results/EVIDENCE_MATRIX.csv
   markdown: results/MD
   pdf: results/PDF
 naming:
@@ -33,10 +36,12 @@ rules:
   registry: REGISTRY_RULES.md
   drive_write: DRIVE_WRITE_RULES.md
   verification: VERIFICATION_RULES.md
+  evidence_matrix: EVIDENCE_MATRIX_RULES.md
 tools:
   notes: notes.py
   registry: registry.py
   verification: verification.py
+  evidence_matrix: evidence_matrix.py
 policy:
   registry_first: true
   duplicate_check_before_id: true
@@ -48,5 +53,9 @@ policy:
   checked_requires_source_verification: true
   checked_allows_documented_source_discrepancies: true
   verification_log_required_for_checked: true
+  evidence_matrix_required_for_active_source: true
+  evidence_matrix_checked_requires_checked_note: true
+  evidence_matrix_note_sha_staleness_guard: true
+  evidence_matrix_update_in_place: true
   results_on_github: false
   source_on_drive: false
