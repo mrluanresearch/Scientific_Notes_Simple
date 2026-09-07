@@ -1,6 +1,6 @@
 # Scientific Notes Simple
 
-Hệ thống source note tối giản cho corpus khoa học lớn. Mỗi nguồn có một định danh `SAL-xxxx`, một main PDF và một Markdown note tự đứng được. Mục tiêu là hiểu, đánh giá, trích dẫn và tái tính bằng chứng mà không phải mở lại PDF chỉ vì note đã bỏ mất thông tin tác giả có báo cáo.
+Hệ thống source-note và evidence-synthesis cho corpus khoa học lớn. Mỗi publication/source có một định danh ổn định `SAL-xxxx`, một main PDF, một Markdown note tự đứng được, một audit row verification và một row study-level trong evidence matrix. Mục tiêu là bảo toàn identity, denominator, methods, kết quả, bất nhất và giới hạn đủ để đọc lại, trích dẫn, so sánh và tái sử dụng bằng chứng có kiểm soát.
 
 ## Kiến trúc canonical
 
@@ -10,11 +10,16 @@ Hệ thống source note tối giản cho corpus khoa học lớn. Mỗi nguồn
 | `NOTE_TEMPLATE.md` | Mẫu note: 6 trường YAML + 8 mục `##` + các tiểu mục chi tiết |
 | `CITATION_RULES.md` | Metadata citation CSL-ready và publication identity |
 | `REGISTRY_RULES.md` | Cấp SAL ID, đặt tên PDF/MD/asset và chống trùng |
+| `VERIFICATION_RULES.md` | Quy tắc nâng `draft` → `checked` và audit source-level verification |
+| `DRIVE_WRITE_RULES.md` | Read-before-write, update-in-place và chống duplicate canonical files |
+| `EVIDENCE_MATRIX_RULES.md` | Schema và nguyên tắc tạo synthesis study-level từ checked notes |
 | `registry.py` | Quản lý `SOURCE_REGISTRY.csv`: init/check/find/register/hash |
 | `notes.py` | Tạo note, QC cấu trúc/độ sâu/citation, INDEX, CSL-JSON |
+| `verification.py` | Kiểm tra traceability registry ↔ verification ↔ MD ↔ INDEX |
+| `evidence_matrix.py` | Kiểm tra schema/provenance/staleness của `EVIDENCE_MATRIX.csv` |
 | `PROJECT.yaml` | Ánh xạ GitHub ↔ Google Drive và policy canonical |
 
-GitHub giữ **source code + template + rules + config**. Google Drive giữ **registry + PDF + MD results**. `results/` không được commit lên GitHub.
+GitHub giữ **source code + template + rules + config**. Google Drive giữ **registry + verification + evidence matrix + PDF + MD results**. `results/` không được commit lên GitHub.
 
 ## Google Drive canonical
 
@@ -24,13 +29,22 @@ Root: `https://drive.google.com/drive/folders/1HxTYs2wg1B0K8QoF3AHuZHBeIpxUgDe_`
 Scientific_Notes_Simple/
 └── results/
     ├── SOURCE_REGISTRY.csv
+    ├── SOURCE_VERIFICATION.csv
+    ├── EVIDENCE_MATRIX.csv
     ├── PDF/
     └── MD/
+        ├── SAL-xxxx.md
+        ├── INDEX.md
+        └── references.csl.json
 ```
 
-- `results/SOURCE_REGISTRY.csv`: identity intake, duplicate control và file mapping.
-- `results/PDF/`: main PDF và supporting assets.
-- `results/MD/`: scientific notes, `INDEX.md`, `references.csl.json` khi sinh.
+Vai trò của ba CSV được tách rõ:
+
+- `SOURCE_REGISTRY.csv`: publication identity, duplicate control, lifecycle và file mapping.
+- `SOURCE_VERIFICATION.csv`: audit source-level verification cho các note `checked`.
+- `EVIDENCE_MATRIX.csv`: một row/source active, chuẩn hóa bằng chứng study-level để synthesis xuyên nghiên cứu.
+
+`EVIDENCE_MATRIX.csv` không thay note và không phải long-form raw dataset cho meta-analysis. Nếu cần one-row-per-drug/gene/outcome, tạo dataset dẫn xuất riêng với provenance quay về SAL ID.
 
 ## Quy tắc đặt tên file
 
@@ -58,91 +72,24 @@ Không dùng `final`, `final2`, `new`, `old`, `(1)`, ngày xử lý, author/year
 
 ID không đổi khi sửa title/DOI/author metadata, không renumber khi sort lại corpus. Sau `SAL-9999` có thể mở rộng thành `SAL-10000`.
 
-## SOURCE_REGISTRY.csv — chống trùng trước khi tạo note
+## Registry-first — chống trùng trước khi tạo note
 
-Registry tồn tại vì `INDEX.md` và corpus MD không đủ để chống trùng ở giai đoạn intake. Một PDF có thể đã được cung cấp nhưng chưa có note; cùng bài báo có thể được upload dưới filename khác; DOI có thể thiếu; preprint và version of record có thể gần giống nhau.
+Trước khi cấp SAL ID hoặc upload main PDF, kiểm tra theo thứ tự:
 
-Các khóa quan trọng trong registry:
+1. DOI exact sau chuẩn hóa.
+2. PMID/PMCID exact.
+3. PDF SHA-256 exact.
+4. Exact normalized title + first author + year.
+5. Exact title + năm cùng hoặc lệch ±1 để phát hiện online-first/preprint/version.
+6. Fuzzy title chỉ tạo candidate review; không auto-merge.
 
-- `title` + `title_key`
-- `year`
-- `first_author` + `first_author_key`
-- `doi` + `doi_key`
-- `pmid`, `pmcid`
-- `journal`
-- publication type/status/version relation
-- `original_filename`
-- canonical `pdf_filename`, `md_filename`
-- `pdf_sha256`
-- lifecycle/audit fields
+Cùng DOI nhưng title khác = **identity conflict**. Cùng title nhưng DOI khác không tự động là duplicate vì có thể là preprint, correction hoặc publication khác. Chi tiết xem `REGISTRY_RULES.md`.
 
-Schema và normalization đầy đủ nằm trong `REGISTRY_RULES.md`.
+## Scientific note
 
-### Thứ tự duplicate check
+Một `full_text` note phải tự đứng được. Nếu thông tin quan trọng có trong PDF nhưng phải mở PDF chỉ để nhớ lại thiết kế, denominator, protocol, primer, threshold, bảng số liệu, bibliographic metadata hoặc giới hạn, note chưa hoàn thành.
 
-1. DOI exact sau chuẩn hóa → hard duplicate candidate.
-2. PMID/PMCID exact → hard candidate khi cùng publication.
-3. PDF SHA-256 exact → exact binary duplicate.
-4. Exact `title_key` + first author + cùng năm → strong candidate.
-5. Exact title + năm cùng hoặc lệch ±1 → probable duplicate/version candidate.
-6. Fuzzy title rất gần + author/journal/locator phù hợp → review thủ công, không auto-merge.
-
-Cùng DOI nhưng title khác = **identity conflict**. Cùng title nhưng DOI khác không tự động là duplicate vì có thể là preprint, correction hoặc publication khác.
-
-## Workflow intake bắt buộc
-
-1. Đọc bibliographic identity tối thiểu: exact title, first author, year, DOI/PMID/PMCID nếu có.
-2. Tính PDF SHA-256 khi có file local.
-3. Check `SOURCE_REGISTRY.csv` trước khi cấp SAL ID hoặc upload main PDF.
-4. Duplicate chắc chắn → dùng SAL ID hiện có; không tạo source mới.
-5. Candidate mơ hồ → review version/metadata trước.
-6. Source mới → `registry.py register` cấp SAL ID.
-7. Main PDF được lưu thành `SAL-xxxx.pdf`; original filename giữ trong registry.
-8. Tạo note bằng **chính SAL ID registry đã cấp**.
-9. Sau khi note tạo/soát, cập nhật registry `note_status`/`updated_at`.
-
-Registry là canonical cho **identity intake + file mapping**. MD là canonical cho **scientific content + full citation metadata**. `INDEX.md` là file dẫn xuất để browse.
-
-## Citation metadata
-
-Mỗi note có block `citation:` ở mục 1 theo cấu trúc gần CSL-JSON. Không lưu một câu APA/Vancouver đã format làm dữ liệu canonical.
-
-Journal article thường cần: authors đầy đủ, `issued`, exact title, journal/container, volume, issue, pages/article number, DOI, URL canonical nếu có. DOI ở registry, YAML note và citation block phải khớp sau chuẩn hóa.
-
-Chi tiết xem `CITATION_RULES.md`.
-
-## Tiêu chuẩn scientific note
-
-Một `full_text` note phải giữ đủ thông tin để người đọc trả lời được:
-
-1. Nghiên cứu hỏi gì, ở đâu, trên quần thể/dữ liệu nào?
-2. Luồng farm/flock/bird/sample/isolate/genome/study ra sao?
-3. Methods cụ thể: culture, AST, PCR, WGS, tool/database/version/threshold, statistics?
-4. Kết quả nào với tử số/mẫu số, unit, CI/p-value, subgroup?
-5. Kết quả âm tính/ngoại lệ nào ảnh hưởng diễn giải?
-6. Abstract ↔ Results ↔ Table ↔ Figure có khớp không; MRLUAN tính lại được gì?
-7. Tác giả diễn giải gì và bằng chứng thực sự hỗ trợ tới đâu?
-8. Dùng lại/tái lập được gì; thiếu supplement/raw data/parameter nào?
-9. Có thể tạo citation đúng mà không mở lại PDF hay không?
-
-Full-text experimental/WGS/AMR thường khoảng **1.800–3.500 từ tiếng Việt chưa tính bảng**; systematic review/meta-analysis thường **2.000–4.000 từ**. Đây là chuẩn biên tập, không phải quota.
-
-Các nguyên tắc bắt buộc:
-
-- Không thay Methods/Results bằng abstract.
-- Không ghi `xem Table X trong PDF` nếu số liệu đó cần dùng lại; chép bảng con cần thiết vào MD.
-- Prevalence/proportion ưu tiên tử số/mẫu số, không chỉ `%`.
-- AST giữ panel/concentration/standard/breakpoint khi nguồn có.
-- PCR giữ target/primer/product size/cycling khi có.
-- WGS giữ platform/reference/tool/database/version/threshold/accession khi có.
-- Meta-analysis giữ search strategy, study count, model, heterogeneity, subgroup, risk of bias, sensitivity/publication bias.
-- `không báo cáo` là dữ liệu quan trọng; không tự điền bằng thông lệ.
-- Gene presence ≠ phenotype/expression; genomic relatedness ≠ direct transmission; association ≠ causality.
-- Nếu số nguồn không khớp, giữ số gốc + phép tính + vị trí; không âm thầm sửa.
-
-## Mẫu note
-
-YAML chỉ gồm:
+YAML canonical chỉ gồm:
 
 ```yaml
 id: SAL-0001
@@ -164,15 +111,84 @@ Tám mục `##` cố định:
 7. Cách dùng lại và phần còn thiếu
 8. Đoạn tổng hợp có thể sử dụng
 
-`NOTE_TEMPLATE.md` định nghĩa các tiểu mục chi tiết bắt buộc.
+Các nguyên tắc quan trọng:
 
-## Trạng thái
+- Không thay Methods/Results bằng abstract.
+- Prevalence/proportion giữ tử số/mẫu số và unit of analysis.
+- Phân biệt farm/flock/bird/sample/isolate/genome/study.
+- AST giữ method/panel/concentration/standard/breakpoint khi nguồn có.
+- PCR giữ target/primer/product size/cycling khi có giá trị tái sử dụng.
+- WGS giữ platform/reference/tool/database/version/threshold/accession khi có.
+- Meta-analysis giữ search strategy, study count, effect model, heterogeneity, subgroup, risk of bias và sensitivity/publication bias.
+- `không báo cáo` là dữ liệu; không tự điền bằng thông lệ.
+- Gene presence ≠ phenotype/expression; genomic relatedness ≠ direct transmission; association ≠ causality.
+- Nếu Abstract ↔ Results ↔ Table ↔ Figure không khớp, giữ cả giá trị nguồn + phép tính lại + vị trí; không âm thầm sửa.
+
+Chi tiết xem `NOTE_TEMPLATE.md` và `AGENTS.md`.
+
+## Trạng thái và source verification
 
 Note:
-- `draft`: đang viết, còn bất nhất, thiếu supplement/raw data quan trọng hoặc citation/scientific result chưa xác minh.
-- `checked`: đã đối chiếu source identity và thông tin trung tâm trong phạm vi đọc khai báo; không có nghĩa peer review độc lập.
 
-Registry có lifecycle riêng: `active`, `review`, `duplicate`, `excluded`, `superseded`.
+- `draft`: đang viết hoặc chưa hoàn tất source-level verification.
+- `checked`: identity và thông tin trung tâm đã được đối chiếu với source trong `read_scope` khai báo.
+
+`checked` không có nghĩa source không có bias, discrepancy đã được giải quyết, supplement/raw data đã được tái lập hoặc kết luận của tác giả đã được xác nhận độc lập. Mọi discrepancy quan trọng vẫn phải nằm trong note và `SOURCE_VERIFICATION.csv`.
+
+## EVIDENCE_MATRIX.csv
+
+Matrix là lớp synthesis study-level. Mỗi `registry_status=active` phải có đúng một row cùng `SAL-xxxx`.
+
+Nhóm trường chính gồm:
+
+- identity: ID, year, author, title, DOI, journal, filenames, hashes;
+- context/design: country/region, study design, population/sample context;
+- denominator/prevalence;
+- serovar;
+- AST;
+- AMR genes/mutations;
+- virulence;
+- WGS/MLST/plasmid/SNP/phylogeny;
+- negative findings/exceptions;
+- arithmetic/internal consistency;
+- limitations;
+- thesis use/comparison conditions/`do_not_conclude`;
+- evidence reuse decision và quantitative reuse scope;
+- verification severity/result/unresolved issues;
+- `note_sha256` để phát hiện row stale khi MD thay đổi.
+
+### Controlled vocabulary: quantitative reuse
+
+- `prevalence_or_sample_level_conditional`
+- `isolate_or_genome_level`
+- `experimental_parameter_only`
+- `review_pooled_estimates`
+- `review_summary_only`
+
+Không được biến selected isolates/genomes thành population prevalence; không biến experimental transfer parameter thành natural prevalence; không dùng review descriptive như pooled estimate.
+
+### Matrix status
+
+- `draft`
+- `generated_from_checked_note`
+- `checked_against_checked_note`
+
+`checked_against_checked_note` chỉ xác nhận row đã được đối chiếu với checked note và verification provenance; không tự động đủ điều kiện meta-analysis.
+
+Chi tiết xem `EVIDENCE_MATRIX_RULES.md`.
+
+## Workflow canonical cho mỗi batch
+
+1. Đọc identity tối thiểu và tính PDF SHA-256.
+2. Duplicate check trong `SOURCE_REGISTRY.csv`.
+3. Cấp SAL ID cho source mới.
+4. Upload PDF canonical bằng read-before-write.
+5. Viết note chi tiết bằng đúng SAL ID.
+6. QC note và source-level verification.
+7. Update registry + verification log + INDEX + CSL in-place.
+8. Tạo/cập nhật đúng một row `EVIDENCE_MATRIX.csv` từ checked note.
+9. Tính `note_sha256`; nếu note đổi, matrix row phải được review lại.
+10. Chạy validators và post-write Drive inventory; không tạo file `final`, `v2` hoặc canonical duplicate.
 
 ## Chạy công cụ
 
@@ -182,7 +198,7 @@ Python 3.10+.
 python -m pip install -r requirements.txt
 ```
 
-### 1. Registry
+### Registry
 
 ```bash
 python registry.py --registry results/SOURCE_REGISTRY.csv check
@@ -192,52 +208,49 @@ python registry.py --registry results/SOURCE_REGISTRY.csv find \
   --year 2026 \
   --first-author "Family, Given" \
   --doi 10.xxxx/xxxxx
-
-python registry.py --registry results/SOURCE_REGISTRY.csv register \
-  --title "Exact source title" \
-  --year 2026 \
-  --first-author "Family, Given" \
-  --doi 10.xxxx/xxxxx \
-  --original-filename original.pdf
 ```
 
-Nếu có local PDF, dùng `--pdf path/to/file.pdf` để script tính SHA-256. `register` từ chối hard duplicate và dừng ở probable duplicate/version candidate trừ khi đã review rồi dùng `--allow-candidate`.
-
-### 2. Tạo note bằng ID registry đã cấp
-
-Ví dụ registry trả `SAL-0001`:
-
-```bash
-python notes.py new \
-  --id SAL-0001 \
-  --title "Exact source title" \
-  --year 2026 \
-  --doi 10.xxxx/xxxxx \
-  --tags amr wgs
-```
-
-`notes.py new --id` bảo đảm note dùng đúng ID registry. Chế độ không truyền `--id` chỉ giữ để tương thích khi chưa vận hành registry-first; không dùng trong workflow canonical mới.
-
-### 3. QC / index / citation export
+### Note / index / citation
 
 ```bash
 python notes.py check
 python notes.py index
 python notes.py csl
-python registry.py --registry results/SOURCE_REGISTRY.csv check
 ```
 
-`notes.py check` là heuristic QC cấu trúc/độ sâu/citation, không chứng minh tính đúng khoa học. `registry.py check` kiểm tra schema, canonical filenames, exact duplicate keys và probable title/version candidates.
+### Verification
 
-## Tổ chức 1.000 tài liệu
+```bash
+python verification.py \
+  --registry results/SOURCE_REGISTRY.csv \
+  --verification results/SOURCE_VERIFICATION.csv \
+  --notes results/MD \
+  --index results/MD/INDEX.md
+```
+
+### Evidence matrix
+
+```bash
+python evidence_matrix.py \
+  --matrix results/EVIDENCE_MATRIX.csv \
+  --registry results/SOURCE_REGISTRY.csv \
+  --verification results/SOURCE_VERIFICATION.csv \
+  --notes results/MD
+```
+
+`evidence_matrix.py` kiểm tra schema, identity, provenance, controlled vocabulary và `note_sha256` staleness. Script không tự trích xuất bằng chứng, không tự sửa denominator và không tự nâng scientific status.
+
+## Tổ chức corpus lớn
 
 Mỗi source active nên có:
 
-- 1 row trong `SOURCE_REGISTRY.csv`
-- 1 main `SAL-xxxx.pdf`
-- 1 `SAL-xxxx.md`
-- supporting assets theo hậu tố chuẩn nếu có
+- 1 row trong `SOURCE_REGISTRY.csv`;
+- 1 main `SAL-xxxx.pdf`;
+- 1 `SAL-xxxx.md`;
+- 1 row trong `SOURCE_VERIFICATION.csv` khi note là `checked`;
+- 1 row trong `EVIDENCE_MATRIX.csv`;
+- supporting assets theo hậu tố chuẩn nếu có.
 
-Sau mỗi đợt 10–20 nguồn, chạy registry check và chọn 2–3 note để đọc ngược với PDF. Nếu xuất hiện lỗi lặp lại, sửa rules/template/code trước khi mở rộng batch.
+Sau mỗi batch 10–20 nguồn, chạy registry/verification/matrix validators và chọn một số note để đọc ngược với PDF. Nếu xuất hiện lỗi lặp lại, sửa rules/template/code trước khi mở rộng corpus.
 
-Chất lượng corpus = **identity sạch + note chi tiết + provenance truy vết được**, không phải chỉ số lượng file.
+Chất lượng corpus = **identity sạch + note chi tiết + verification truy vết được + synthesis không làm mất denominator/giới hạn**.
